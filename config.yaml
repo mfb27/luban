@@ -1,0 +1,31 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+
+web:
+  static_dir: ./web
+
+log:
+  level: info
+
+mysql:
+  # user: root, pass: root, db: luban (see docker-compose)
+  dsn: root:123123@tcp(127.0.0.1:3306)/luban?charset=utf8mb4&parseTime=True&loc=Local
+
+redis:
+  addr: 127.0.0.1:6379
+  password: ""
+  db: 0
+
+minio:
+  endpoint: 127.0.0.1:9000
+  access_key_id: minioadmin
+  secret_access_key: minioadmin
+  bucket: luban
+  use_ssl: false
+  # if you map minio behind a gateway, set this to the external base url
+  public_base_url: http://127.0.0.1:9000
+
+zhipuai:
+  api_key: 7fd85e544194470e9cec7456dfa3cf3f.6DVLuIcjBLF0BmTS
+  api_url: https://api.zhipuai.com/v1/chat/completions

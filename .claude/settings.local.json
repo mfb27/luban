@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find . -name \"*.go\" -exec grep -l \"model\\\\|Model\" {} \\\\; | head -10)",
+      "Bash(go build:*)",
+      "Bash(go run:*)",
+      "WebSearch",
+      "Bash(cd \"D:\\\\space\\\\luban\" && go test ./internal/handler -v)",
+      "Bash(taskkill //F //PID 13516)",
+      "Bash(go get:*)",
+      "Bash(node -c web/assets/app.js)",
+      "Bash(docker-compose up:*)",
+      "Bash(taskkill /F /IM luban.exe)",
+      "Bash(pkill -f \"luban.exe\")",
+      "Bash(netstat -ano | findstr :8080)",
+      "Bash(taskkill /F /PID 16740)",
+      "Bash(taskkill //F //PID 16740)",
+      "Bash(docker exec:*)",
+      "Bash(netstat -ano | findstr :9000)"
+    ]
+  }
+}
