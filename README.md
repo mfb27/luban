@@ -10,7 +10,7 @@ Luban 是一个基于 Go 语言开发的智能聊天应用，提供与 AI 模型
 - ⚡ Redis 缓存支持
 - 📁 MinIO 文件存储
 - 🔐 GORM ORM 支持
-- 🌐 简洁的 Web 界面
+- 🌐 原生 HTML/CSS/JS 前端
 - ⚖️ 结构化日志记录
 
 ## 快速开始
@@ -84,7 +84,14 @@ luban/
 │   ├── cache/            # Redis 缓存实现
 │   ├── storage/          # MinIO 文件存储
 │   └── logger/           # 日志配置
-├── web/                  # 前端静态文件
+├── frontend/             # 前端静态文件（HTML/CSS/JS）
+│   ├── css/              # 样式文件
+│   ├── js/               # JavaScript 文件
+│   ├── images/           # 图片资源
+│   ├── index.html        # 主页面
+│   ├── build.sh          # 构建脚本
+│   └── dev-server.sh     # 开发服务器脚本
+├── web/                  # 旧版前端文件（已迁移到 frontend/）
 ├── config.yaml           # 配置文件
 ├── docker-compose.yml    # Docker Compose 配置
 ├── go.mod               # Go 模块文件
@@ -161,7 +168,7 @@ type AppDeps struct {
 1. **聊天接口**: 目前返回模拟响应，需要集成实际的 AI 模型 API。
 2. **模型管理**: 基础模型列表存在，但未实现真正的模型适配器。
 3. **身份验证**: 未实现用户身份验证系统。
-4. **前端**: 简单的 HTML/JS 界面，无需构建步骤。
+4. **前端**: 原生 HTML/CSS/JS 界面，支持开发和生产构建。
 
 ## 重要设计模式
 

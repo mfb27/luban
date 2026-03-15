@@ -3,7 +3,7 @@ server:
   port: 8080
 
 web:
-  static_dir: ./web
+  static_dir: ./frontend
 
 log:
   level: info

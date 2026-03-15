@@ -5,6 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Luban Chat</title>
     <link rel="stylesheet" href="/assets/style.css" />
+    <!-- Environment-specific script injection -->
+    <script>
+      (function() {
+        const env = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'development'
+          : 'production';
+
+        // Load development config if it exists
+        if (env === 'development' && typeof window.ENV_CONFIG === 'undefined') {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', '/config.dev.js', true);
+          xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+              eval(xhr.responseText);
+            }
+          };
+          xhr.send();
+        }
+
+        // Set default config if not already set
+        if (typeof window.ENV_CONFIG === 'undefined') {
+          window.ENV_CONFIG = {
+            API_URL: env === 'development' ? 'http://localhost:8080' : ''
+          };
+        }
+      })();
+    </script>
   </head>
   <body>
     <div class="app">
@@ -201,4 +228,3 @@
     <script src="/assets/app.js"></script>
   </body>
 </html>
-

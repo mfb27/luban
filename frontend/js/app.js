@@ -57,6 +57,30 @@ function setTheme(theme) {
   localStorage.setItem("theme", theme);
 }
 
+// API base URL detection
+function getApiBaseUrl() {
+  // Check if we're in development (localhost)
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    // Check if backend is available on localhost:8080
+    try {
+      // Try to detect if we're running with backend
+      if (window.ENV_CONFIG && window.ENV_CONFIG.API_URL) {
+        return window.ENV_CONFIG.API_URL;
+      }
+      // Default development URL
+      return 'http://localhost:8080';
+    } catch (e) {
+      return 'http://localhost:8080';
+    }
+  }
+
+  // Production mode - use relative path (will be proxied by Nginx)
+  return '';
+}
+
+// API base URL
+const API_BASE_URL = getApiBaseUrl();
+
 async function api(path, options = {}) {
   const token = localStorage.getItem("token");
   const headers = {
@@ -69,7 +93,8 @@ async function api(path, options = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(path, {
+  const url = API_BASE_URL + path;
+  const res = await fetch(url, {
     ...options,
     headers,
   });
@@ -312,17 +337,17 @@ async function send() {
       attachment_urls: state.attachmentURLs,
     });
 
-    // Get token for authenticated request
+    // Call streaming API directly - need to handle response manually for SSE
     const token = localStorage.getItem("token");
-    const headers = { "Content-Type": "application/json" };
+    const headers = {
+      "Content-Type": "application/json",
+    };
 
-    // Add Authorization header if token exists
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // Call streaming API
-    const response = await fetch("/api/chat", {
+    const response = await fetch(API_BASE_URL + "/api/chat", {
       method: "POST",
       headers,
       body: reqBody,

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mfb27/luban/internal/config"
@@ -18,15 +17,15 @@ import (
 type App struct {
 	Engine *gin.Engine
 
-	cfg    *config.Config
-	log    *zap.Logger
-	db     *gorm.DB
-	redis  *redis.Client
-	minio  *storage.MinIO
-	zhipu  *zhipu.Client
+	cfg   *config.Config
+	log   *zap.Logger
+	db    *gorm.DB
+	redis *redis.Client
+	minio *storage.MinIO
+	zhipu *zhipu.Client
 
-	minioBucket      string
-	minioPublicBase  string
+	minioBucket     string
+	minioPublicBase string
 }
 
 type AppDeps struct {
@@ -51,6 +50,9 @@ func NewApp(deps AppDeps) (*App, error) {
 	engine.Use(gin.Recovery())
 	engine.Use(middleware.WithRequestID(deps.Log))
 	engine.Use(gin.Logger())
+
+	// Use simple CORS middleware for development
+	engine.Use(middleware.SimpleCORSMiddleware())
 
 	// Create ZhipuAI client
 	zhipuClient := zhipu.NewClient(&zhipu.Config{
@@ -77,7 +79,10 @@ func NewApp(deps AppDeps) (*App, error) {
 }
 
 func (a *App) registerRoutes() {
-	a.Engine.GET("/api/health", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+	// Health check endpoint
+	a.Engine.GET("/api/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
 
 	// Public routes
 	api := a.Engine.Group("/api")
@@ -89,6 +94,9 @@ func (a *App) registerRoutes() {
 		// Public routes (no authentication required)
 		api.GET("/models", a.getModels)
 
+		// Chat route (public)
+		api.POST("/chat", a.postChat)
+
 		// Protected routes (require authentication)
 		auth := api.Group("/user")
 		auth.Use(middleware.AuthMiddleware())
@@ -96,10 +104,6 @@ func (a *App) registerRoutes() {
 			auth.GET("/me", a.getUser)
 		}
 
-		// Chat route (public)
-		api.POST("/chat", a.postChat)
-
-		// Protected routes
 		protected := api.Group("/", middleware.AuthMiddleware())
 		{
 			protected.GET("/sessions", a.listSessions)
@@ -110,12 +114,12 @@ func (a *App) registerRoutes() {
 	}
 
 	// static
-	staticDir := a.cfg.Web.StaticDir
-	if staticDir == "" {
-		staticDir = "./web"
-	}
-	a.Engine.Static("/assets", filepath.Join(staticDir, "assets"))
-	a.Engine.StaticFile("/", filepath.Join(staticDir, "index.html"))
+	// staticDir := a.cfg.Web.StaticDir
+	// if staticDir == "" {
+	// 	staticDir = "./frontend"
+	// }
+	// a.Engine.Static("/assets", filepath.Join(staticDir, "assets"))
+	// a.Engine.StaticFile("/", filepath.Join(staticDir, "index.html"))
 }
 
 // migrateSessions adds user_id to existing sessions
@@ -141,4 +145,3 @@ func migrateSessions(db *gorm.DB) error {
 
 	return nil
 }
-
