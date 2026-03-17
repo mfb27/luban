@@ -50,6 +50,94 @@ html[data-theme="dark"] {
   --bubble-assistant: rgba(51, 65, 85, 0.5);
 }
 
+/* Glass Panel Base Classes */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Glass Variants */
+.glass-default {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-elevated {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+  padding: 1.5rem;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+  padding: 1rem;
+  transition: all var(--transition-base);
+}
+
+/* Glass Interaction States */
+.glass:hover {
+  border-color: var(--glass-border-hover, rgba(255, 255, 255, 0.6));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.glass:active {
+  transform: scale(0.98);
+}
+
+/* Glass Utility Classes */
+.glass-sm {
+  padding: 0.5rem;
+  border-radius: 12px;
+}
+
+.glass-md {
+  padding: 1rem;
+  border-radius: 16px;
+}
+
+.glass-lg {
+  padding: 2rem;
+  border-radius: 24px;
+}
+
+/* Glass Focus States */
+.glass:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.glass:focus {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
 * {
   box-sizing: border-box;
 }
