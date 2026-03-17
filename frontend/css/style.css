@@ -441,8 +441,10 @@ body {
 }
 
 .session-item {
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 10px 10px;
   display: grid;
@@ -451,21 +453,29 @@ body {
   transition: all var(--transition-base);
 }
 
+/* Session card hover effect - lift and glow */
 .session-item:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px var(--glass-shadow-glow);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.session-item.active {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--primary-glow);
+  border-color: rgba(99, 102, 241, 0.3);
 }
 
 .session-item:active {
   transform: translateY(0);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--glass-shadow);
 }
 
-.session-item.active {
-  outline: 2px solid rgba(99, 102, 241, 0.5);
-  outline-offset: 1px;
-  border-color: rgba(99, 102, 241, 0.3);
+@media (prefers-reduced-motion: reduce) {
+  .session-item:hover {
+    transform: none;
+  }
 }
 .session-title {
   font-size: 13px;
