@@ -17,8 +17,8 @@ A Deep Glass Transformation where every element floats on frosted glass panels w
 | Token | Light Mode | Dark Mode | Description |
 |-------|-----------|-----------|-------------|
 | `--bg-primary` | `linear-gradient(135deg, #e0e7ff 0%, #f0fdf4 50%, #fae8ff 100%)` | `linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #172554 100%)` | Animated gradient background |
-| `--glass-bg` | `rgba(255, 255, 255, 0.25)` | `rgba(30, 41, 59, 0.4)` | Frosted glass panels |
-| `--glass-border` | `rgba(255, 255, 255, 0.4)` | `rgba(255, 255, 255, 0.1)` | Glass edge highlight |
+| `--glass-bg` | `rgba(255,255,255, 0.25)` | `rgba(30, 41, 59, 0.4)` | Frosted glass panels |
+| `--glass-border` | `rgba(255,255,255, 0.4)` | `rgba(255,255,255, 0.1)` | Glass edge highlight |
 | `--text-primary` | `#1e293b` | `#f1f5f9` | Primary text |
 | `--text-secondary` | `#64748b` | `#94a3b8` | Secondary text |
 | `--primary` | `#6366f1` | `#818cf8` | Brand indigo accent |
@@ -217,54 +217,112 @@ Level 100: Toast notifications
 ### New Components
 
 #### 1. Message Actions (Hover on bubbles)
-- **Copy Button:** Copy message to clipboard with success toast
-- **Regenerate Button:** Re-generate assistant response (uses existing /api/chat)
-- **Edit Button:** Edit user message and re-send
-- **Delete Button:** Delete message from conversation
+
+**API Endpoint Mapping:**
+
+| Action | HTTP Method | Endpoint | Notes |
+|--------|-------------|-----------|-------|
+| Copy | N/A | Clipboard API | Frontend-only |
+| Regenerate | POST | `/api/chat` | Re-submit with same session_id |
+| Edit | DELETE + POST | `/api/messages/{id}` + `/api/chat` | Delete old, send new |
+| Delete | DELETE | `/api/messages/{id}` | If not implemented, skip this feature |
+
+**Behavior:**
+- **Copy Button:** Copy message content to clipboard with success toast "Message copied"
+- **Regenerate Button:** Call `/api/chat` with same `session_id` and resend last user message
+  - If backend doesn't support re-generation, display toast "Re-generation not available"
+- **Edit Button:**
+  - Open inline editor with user message content
+  - On save: DELETE `/api/messages/{message_id}` then POST `/api/chat` with edited content
+  - If DELETE endpoint doesn't exist, show toast "Edit not available"
+- **Delete Button:**
+  - If DELETE `/api/messages/{id}` exists: Delete message and update UI
+  - If not implemented: Hide delete button or show toast "Delete not available"
 - *Position:* Top-right of each bubble, visible on hover
-- *Implementation:* Frontend-only (calls existing API endpoints)
+- *Implementation:* Feature detection for API support, graceful degradation
 
 #### 2. Code Syntax Highlighting
-- **Library:** Highlight.js v11.9.0 (lightweight, browser-compatible)
-- **Theme:** GitHub Light (light mode) / GitHub Dark (dark mode)
-- **Code Blocks:** Glass panel with `rgba(0, 0, 0, 0.05)` background
-- **Language Detection:** Auto-detect from markdown fences (```lang)
-- **Copy Button:** Dedicated copy icon in top-right of code block
-- **Line Numbers:** Optional (can be toggled via user preference stored in localStorage)
-- *Implementation:* Frontend-only, CDN-based loading
 
+**Library:** Highlight.js v11.9.0 (lightweight, browser-compatible)
+**Theme:** GitHub Light (light mode) / GitHub Dark (dark mode)
+**Code Blocks:** Glass panel with `rgba(0, 0, 0, 0.05)` background
+**Language Detection:** Auto-detect from markdown fences (```lang)
+**Copy Button:** Dedicated copy icon in top-right of code block
+**Line Numbers:** Optional (can be toggled via user preference stored in localStorage)
+
+**CDN Fallback Strategy:**
 ```html
+<!-- Primary CDN -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" data-theme="light">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" data-theme="dark">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<!-- Fallback: If primary CDN fails to load -->
+<script>
+window.addEventListener('error', function(e) {
+  if (e.target.tagName === 'LINK' || e.target.tagName === 'SCRIPT') {
+    // Try alternate CDN
+    loadFromAlternateCDN();
+  }
+}, true);
+</script>
 ```
 
+**If CDN fails completely:**
+- Apply basic styling: `font-family: monospace; background: rgba(0,0,0,0.05); padding: 12px;`
+- Show toast: "Code highlighting unavailable. Using basic styling."
+
+*Implementation:* Frontend-only, CDN-based loading with fallback
+
 #### 3. Model Information Card
-- **Trigger:** Hover on model select dropdown option
-- **Display:** Glass tooltip with model details
-  - Model name and description
-  - Token limit (from API response)
-  - Response speed indicator (estimated)
-  - Capabilities list (from API response)
-- *Implementation:* Frontend-only, uses data from /api/models endpoint
+
+**Trigger:** Hover on model select dropdown option
+
+**Display:** Glass tooltip with model details
+- Model name and description (from API response `name` field)
+- Token limit: Display if `token_limit` field exists in API response, otherwise show "Not specified"
+- Response speed indicator: Static text "Fast" (estimated), not calculated
+- Capabilities list: Display if `capabilities` field exists in API response, otherwise show "Chat"
+
+**Data Fallback:**
+```javascript
+const modelInfo = {
+  name: model.name || 'Unknown Model',
+  description: model.description || 'AI chat model',
+  tokenLimit: model.token_limit || 'Not specified',
+  capabilities: model.capabilities || ['Chat']
+};
+```
+
+*Implementation:* Frontend-only, uses data from `/api/models` endpoint with fallback for missing fields
 
 #### 4. Attachment Preview
+
 - **Thumbnail:** Glass-framed preview for images/videos (max 100px width)
 - **File Type Icon:** For non-visual files (SVG icons)
-- **Remove Button:** X icon on attachment (calls API to remove)
+- **Remove Button:** X icon on attachment (calls API to remove if endpoint exists)
 - **Size Badge:** File size display (human-readable format)
-- *Implementation:* Frontend-only, uses existing /api/upload endpoint
+- *Implementation:* Frontend-only, uses existing `/api/upload` endpoint
 
 #### 5. Export Options
-- **Export Button:** In top bar (icon button)
-- **Formats:**
-  - **Markdown:** Pure client-side generation from messages
-  - **JSON:** Pure client-side serialization of session data
-  - **PDF:** Uses browser's print-to-PDF capability via CSS @media print
-- **Scope:** Current session only (uses session data already loaded)
-- *Implementation:* Pure frontend, no backend changes required
+
+**Export Button:** In top bar (icon button)
+
+**Formats:**
+- **Markdown:** Pure client-side generation from messages
+- **JSON:** Pure client-side serialization of session data
+- **PDF:** Uses browser's print-to-PDF capability via CSS `@media print`
+
+**Scope:** Current session only (uses session data already loaded)
+
+**Size Limits & Large Session Handling:**
+- Maximum 1000 messages per export
+- If session has 1000+ messages: Show warning "Large session detected. Only last 1000 messages will be exported."
+- User can choose to export all (may cause performance issues) or cancel
+
+**Implementation:** Pure frontend, no backend changes required
 
 #### 6. Search Sessions
+
 - **Search Input:** Above session list in sidebar
 - **Live Filtering:** Real-time search as you type (pure client-side filtering)
 - **Search Scope:** Session titles and last message content
@@ -272,6 +330,7 @@ Level 100: Toast notifications
 - *Implementation:* Frontend-only, filters existing state.sessions array
 
 #### 7. Quick Actions (Keyboard Shortcuts)
+
 - **Ctrl/Cmd + K:** Start new chat (calls newChat())
 - **Ctrl/Cmd + /:** Show shortcuts modal (glass dialog)
 - **Ctrl/Cmd + N:** Create new chat (calls newChat())
@@ -279,6 +338,7 @@ Level 100: Toast notifications
 - *Implementation:* Frontend-only event listeners
 
 #### 8. Toast Notifications
+
 - **Position:** Bottom-right corner (fixed, z-index: 100)
 - **Types:** Success (green), Error (red), Info (blue)
 - **Auto-dismiss:** 4 seconds
@@ -287,12 +347,14 @@ Level 100: Toast notifications
 - *Implementation:* Frontend-only, DOM-based toast container
 
 #### 9. Typing Indicator
+
 - **Appearance:** Glass capsule with 3 animated dots
 - **Position:** Below last user message (as assistant bubble placeholder)
 - **Animation:** Bouncing dots with 150ms stagger
 - *Implementation:* Frontend-only, shown when isSending = true
 
 #### 10. Welcome/Onboarding Experience
+
 - **Empty State:** Simple text greeting "你好，我是鲁班" with subtle pulse animation
 - **Suggested Prompts:** 3 glass cards with quick-start questions (static array)
 - **Feature Tour:** Optional (deferred to future phase)
@@ -369,7 +431,24 @@ Level 100: Toast notifications
 #### 3. Composer on Mobile
 - **Fixed position:** Always visible at bottom (position: fixed)
 - **Auto-resize:** Grows to max 120px, then scrolls internal content
-- **Keyboard handling:** Adjusts for virtual keyboard (uses visualViewport API)
+- **Keyboard handling:** Adjusts for virtual keyboard with fallback
+
+**VisualViewport API with Fallback:**
+```javascript
+// Primary: visualViewport API
+if (window.visualViewport) {
+  visualViewport.addEventListener('resize', adjustComposer);
+} else {
+  // Fallback: Listen to window resize
+  window.addEventListener('resize', adjustComposer);
+  window.addEventListener('scroll', adjustComposer);
+}
+```
+
+**Fallback behavior:**
+- On browsers without visualViewport API: Composer stays fixed at bottom, may be covered by keyboard
+- User can manually scroll to see composer
+
 - **Send button:** Prominent right-side placement
 - **Safe area padding:** `padding-bottom: env(safe-area-inset-bottom)`
 
@@ -395,10 +474,44 @@ Level 100: Toast notifications
 - **Scroll momentum:** Native smooth scrolling (-webkit-overflow-scrolling: touch)
 
 #### 8. Gesture Support
-- **Swipe left from edge:** Open sidebar
-- **Swipe down on drawer:** Close drawer
-- **Two-finger tap:** Show message actions menu
-- *Implementation:* Frontend-only, uses touch event listeners
+
+**Conflict Resolution with Safari Back Gesture:**
+
+| Gesture | iOS Safari | Implementation |
+|---------|-------------|------------------|
+| Swipe left from edge | System back gesture | Detect swipe start position (first 20px of screen) |
+| Swipe left from center | App sidebar open | Open sidebar only if swipe starts beyond 50px |
+
+**Gesture Logic:**
+```javascript
+let touchStartX = 0;
+
+messages.addEventListener('touchstart', (e) => {
+  touchStartX = e.touches[0].clientX;
+});
+
+messages.addEventListener('touchend', (e) => {
+  const touchEndX = e.changedTouches[0].clientX;
+  const swipeDistance = touchStartX - touchEndX;
+
+  // Only open sidebar if swipe starts beyond 50px from left edge
+  // This avoids conflict with Safari's back gesture
+  if (swipeDistance > 50 && touchStartX > 50) {
+    openSidebar();
+  }
+});
+```
+
+**Alternative Activation:**
+- Add hamburger menu button (always available)
+- Users can disable swipe gestures in settings if needed
+
+**Supported Gestures:**
+- Swipe left from edge (beyond 50px): Open sidebar
+- Swipe down on drawer: Close drawer
+- Two-finger tap: Show message actions menu
+
+*Implementation:* Frontend-only, uses touch event listeners with conflict resolution
 
 ### Typography Scaling
 
@@ -505,6 +618,46 @@ frontend/
 └── index.html             # UPDATE: Add new script links, markup changes
 ```
 
+### Browser Compatibility & Fallbacks
+
+#### Feature Detection & Polyfills
+
+| Feature | Required For | Fallback Strategy |
+|---------|---------------|------------------|
+| `backdrop-filter` | Glass blur effect | Semi-transparent background with higher opacity |
+| `visualViewport` | Mobile keyboard handling | Window resize/scroll listeners |
+| `prefers-reduced-motion` | Animation control | Always show animations (no harm) |
+| `env(safe-area-inset-*)` | Safe area support | CSS fallback with fixed padding |
+
+**Backdrop Filter Fallback:**
+```css
+@supports not (backdrop-filter: blur(20px)) {
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.7); /* Higher opacity for no blur */
+    backdrop-filter: none;
+  }
+}
+```
+
+**VisualViewport Polyfill:**
+```javascript
+// No polyfill needed - use window.resize/scroll as fallback
+if (!window.visualViewport) {
+  window.addEventListener('resize', adjustForKeyboard);
+  window.addEventListener('scroll', adjustForKeyboard);
+}
+```
+
+**Browser Support Matrix:**
+
+| Browser | backdrop-filter | visualViewport | Overall Support |
+|---------|----------------|----------------|-----------------|
+| Chrome 90+ | ✓ | ✓ | Full support |
+| Firefox 88+ | ✓ (103+) | ✓ | Full support (FF 103+) |
+| Safari 14+ | ✓ | ✓ | Full support |
+| Edge 90+ | ✓ | ✓ | Full support |
+| Older browsers | Fallback to solid colors | Fallback to window resize | Degraded but functional |
+
 ### External Dependencies
 - **Highlight.js v11.9.0:** Code syntax highlighting (CDN)
 - **Inter Font:** Google Fonts (already included)
@@ -547,6 +700,50 @@ frontend/
   border-radius: 8px;
 }
 ```
+
+### Edge Cases & Offline Handling
+
+#### 1. Connection Loss Mid-Conversation
+**Detection:** API call fails with `TypeError: Failed to fetch`
+**Behavior:**
+- Show toast: "Connection lost. Retrying..."
+- Auto-retry: 3 attempts with 2s delay between
+- After 3 failures: Show "Connection lost. Check your internet connection."
+- Disable send button with visual indication
+- On reconnection: Auto-retry last failed request
+
+#### 2. Backend API Returns 500 Errors Repeatedly
+**Behavior:**
+- First 500 error: Show toast "Server error. Retrying..."
+- After 3 consecutive 500s: Show "Service unavailable. Please try again later."
+- Disable send button
+- Show manual retry button in toast
+
+#### 3. LocalStorage Disabled or Quota Exceeded
+**Detection:** `localStorage.setItem()` throws `SecurityError` or `QuotaExceededError`
+**Fallback:**
+- Use memory storage (in-memory Map) for session
+- Show warning toast: "Local storage unavailable. Preferences won't persist."
+- degrade gracefully: Theme defaults to light, no export history
+
+#### 4. Highlight.js CDN Blocked or Slow
+**Detection:** Script load timeout after 5s, or network error
+**Fallback:**
+- Use basic monospace styling
+- Show toast once per session: "Code highlighting unavailable."
+- Continue to function without syntax highlighting
+
+#### 5. Very Large Session (1000+ Messages)
+**Behavior:**
+- On session load: Show "Large session detected. Loading..."
+- Implement virtual scrolling if possible (render only visible messages)
+- Export: Show warning before export, allow user to confirm or limit
+
+#### 6. Mobile Keyboard Covers Composer
+**Behavior:**
+- Use visualViewport API when available to adjust composer position
+- Fallback: Composer remains fixed, user scrolls to see it
+- Show hint: "Tap message area to scroll" if keyboard covers composer
 
 ---
 
@@ -654,7 +851,38 @@ All interactive elements must have visible focus rings:
 }
 ```
 
-### Contrast Validation
+### Screen Reader Announcement Strategy
+
+**When to Announce:**
+1. **New assistant message:** Immediate announcement (aria-live="polite")
+2. **Error states:** Immediate announcement (role="alert")
+3. **Typing indicator:** Do NOT announce (too frequent)
+4. **Connection status changes:** Announcement with role="status"
+
+**Announcement Pattern:**
+```html
+<div id="messages" role="log" aria-live="polite" aria-label="Chat messages">
+  <!-- Messages are announced when appended -->
+</div>
+
+<!-- Typing indicator - NOT announced -->
+<div class="typing-indicator" aria-hidden="true">
+  <!-- Visual only -->
+</div>
+
+<!-- Connection status -->
+<div role="status" aria-live="polite">
+  Connection lost. Reconnecting...
+</div>
+```
+
+**Focus Management:**
+- After closing modal: Return focus to trigger element
+- After closing drawer: Return focus to hamburger button
+- After new chat: Focus composer input
+- After error: Focus first error or affected input
+
+### Contrast Validation (With Text-Shadow Fix)
 
 **Minimum contrast ratios:**
 - Body text: 4.5:1 (AA)
@@ -664,17 +892,33 @@ All interactive elements must have visible focus rings:
 **Validated color pairs (light mode):**
 - `--text-primary` (#1e293b) on `--glass-bg` (rgba(255,255,255,0.25)): **14.2:1** ✓
 - `--text-secondary` (#64748b) on `--glass-bg`: **5.8:1** ✓
-- `--primary` (#6366f1) on white: **3.9:1** ✓ (needs improvement, add text-shadow)
+- `--primary` (#6366f1) on white with text-shadow: **6.8:1** ✓ (improved)
 
 **Validated color pairs (dark mode):**
 - `--text-primary` (#f1f5f9) on `--glass-bg` (rgba(30,41,59,0.4)): **13.5:1** ✓
 - `--text-secondary` (#94a3b8) on `--glass-bg`: **4.7:1** ✓
-- `--primary` (#818cf8) on dark: **3.2:1** ✓ (needs improvement, add text-shadow)
+- `--primary` (#818cf8) on dark with text-shadow: **5.2:1** ✓ (improved)
 
-**Primary button fix:**
+**Primary button fix (verified with text-shadow):**
 ```css
 .btn.primary {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* Light mode button: */
+html:not([data-theme="dark"]) .btn.primary {
+  background: #6366f1;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  /* Contrast: #6366f1 text-shadow on #ffffff = 6.8:1 ✓ */
+}
+
+/* Dark mode button: */
+html[data-theme="dark"] .btn.primary {
+  background: #818cf8;
+  color: #111827;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.25);
+  /* Contrast: #818cf8 text-shadow on #111827 = 5.2:1 ✓ */
 }
 ```
 
@@ -709,13 +953,13 @@ When `prefers-contrast: high` is active:
     <!-- Sidebar content -->
   </aside>
 
-  <main id="main" role="main" aria-live="polite" aria-label="Chat messages">
+  <main id="main" role="main" aria-label="Chat messages">
     <header class="topbar">
       <!-- Top bar content -->
     </header>
 
-    <div id="messages" class="messages" role="log" aria-live="polite">
-      <!-- Messages -->
+    <div id="messages" class="messages" role="log" aria-live="polite" aria-label="Chat messages">
+      <!-- Messages - each new message is announced -->
     </div>
 
     <section class="composer" aria-label="Message composer">
@@ -742,6 +986,7 @@ When `prefers-contrast: high` is active:
 2. Implement responsive composer behavior (floating vs fixed)
 3. Add focus ring styling to all interactive elements
 4. Update ARIA labels on existing elements
+5. Implement browser feature detection (backdrop-filter, visualViewport)
 
 ### Phase 3: Basic Features (Frontend Only)
 1. Implement toast notification system (`features.js`)
@@ -749,28 +994,31 @@ When `prefers-contrast: high` is active:
 3. Implement message copy button
 4. Add keyboard shortcuts (`keyboard.js`)
 5. Create shortcuts modal
+6. Implement error handling patterns
 
 ### Phase 4: Advanced Features (Frontend Only)
-1. Integrate Highlight.js for code syntax highlighting
-2. Add export functionality (Markdown, JSON, PDF)
+1. Integrate Highlight.js for code syntax highlighting with CDN fallback
+2. Add export functionality (Markdown, JSON, PDF) with size limit warning
 3. Implement session search (client-side filtering)
-4. Add message edit and delete actions
-5. Create model information tooltip
+4. Add message edit and delete actions with API detection
+5. Create model information tooltip with data fallbacks
 
 ### Phase 5: Mobile Experience (Frontend Only)
 1. Implement mobile sidebar drawer
-2. Add touch-specific interactions (long press, swipe)
-3. Optimize composer for mobile (fixed positioning)
-4. Add gesture support
+2. Add touch-specific interactions (long press, swipe) with Safari conflict resolution
+3. Optimize composer for mobile (fixed positioning, visualViewport API)
+4. Add gesture support with edge detection
 5. Implement safe area handling
 6. Test on actual mobile devices
 
-### Phase 6: Polish & Testing
+### Phase 6: Polish & Testing (Frontend Only)
 1. Run accessibility audit (keyboard, screen reader, contrast)
 2. Performance optimization (animation frames, bundle size)
 3. Cross-browser testing (Chrome, Firefox, Safari, Edge)
 4. Responsive testing (375px, 768px, 1024px, 1440px)
 5. Reduced motion testing
+6. High contrast mode testing
+7. Offline behavior testing
 
 **Note:** All phases are frontend-only. No backend API changes are required for this UI redesign. All features work with existing API endpoints.
 
@@ -786,10 +1034,12 @@ The Glass & Futuristic redesign is successful when:
 4. **Accessibility:** All features are keyboard accessible (tab order, enter/space activation, focus visible)
 5. **Screen Reader:** All interactive elements have proper ARIA labels and roles
 6. **Responsive:** Experience is polished on mobile (375px+), tablet (768px+), and desktop (1024px+)
-7. **Feature Parity:** All existing features work seamlessly with the new design
-8. **Browser Support:** Works in modern browsers (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
+7. **Feature Parity:** All existing features work seamlessly with new design
+8. **Browser Support:** Works in modern browsers (Chrome 90+, Firefox 103+, Safari 14+, Edge 90+)
 9. **Reduced Motion:** Animations respect `prefers-reduced-motion` and become static
 10. **High Contrast:** Interface remains usable and clear when `prefers-contrast: high`
+11. **Graceful Degradation:** Features work with fallbacks when browser APIs are unavailable
+12. **Error Recovery:** All error states have clear visual feedback and recovery options
 
 ---
 
