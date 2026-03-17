@@ -226,6 +226,122 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    --glass-bg: rgba(0, 0, 0, 0.9);
+    --glass-border: #000000;
+    --text-primary: #ffffff;
+    --text-secondary: #ffffff;
+    --primary: #ffffff;
+    --primary-glow: #ffffff;
+    --bg-sidebar: rgba(0, 0, 0, 0.9);
+    --bubble-assistant: rgba(0, 0, 0, 0.9);
+  }
+
+  html[data-theme="dark"] {
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-border: #ffffff;
+    --text-primary: #000000;
+    --text-secondary: #000000;
+    --primary: #000000;
+    --primary-glow: #000000;
+    --bg-sidebar: rgba(255, 255, 255, 0.95);
+    --bubble-assistant: rgba(255, 255, 255, 0.95);
+  }
+
+  /* Enhanced Focus Styles for High Contrast */
+  *:focus {
+    outline: 3px solid #ffffff;
+    outline-offset: 2px;
+  }
+
+  *:focus-visible {
+    outline: 3px solid #ffffff;
+    outline-offset: 2px;
+  }
+
+  .btn:focus,
+  .btn:focus-visible {
+    outline: 3px solid #ffffff;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 3px solid #ffffff;
+    outline-offset: 2px;
+    box-shadow: none;
+    border-color: #ffffff;
+  }
+
+  button:focus,
+  a:focus,
+  button:focus-visible,
+  a:focus-visible {
+    outline: 3px solid #ffffff;
+    outline-offset: 2px;
+  }
+
+  /* Glass Elements in High Contrast */
+  .glass,
+  .glass-default,
+  .glass-elevated,
+  .glass-card,
+  .glass-panel {
+    background: var(--glass-bg);
+    border: 2px solid var(--glass-border);
+    box-shadow: none;
+  }
+
+  /* Remove transparency for better readability */
+  .sidebar,
+  .topbar,
+  .composer {
+    background: var(--glass-bg);
+    border: 2px solid var(--glass-border);
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Remove animations */
+  .btn {
+    transition: none;
+  }
+
+  .glass {
+    transition: none;
+  }
+
+  .message {
+    animation: none;
+  }
+
+  /* Remove hover effects that cause motion */
+  .glass:hover {
+    transform: none;
+  }
+
+  .glass:active {
+    transform: none;
+  }
+}
+
 body {
   margin: 0;
   background: var(--bg-primary);
