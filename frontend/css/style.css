@@ -591,12 +591,26 @@ body {
 }
 
 .topbar {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
   padding: 16px 18px;
-  border-bottom: 1px solid var(--border);
+}
+
+/* Top bar hover effect */
+.topbar:hover {
+  box-shadow: 0 4px 12px var(--glass-shadow-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar:hover {
+    box-shadow: none;
+  }
 }
 .topbar-right {
   display: inline-flex;
