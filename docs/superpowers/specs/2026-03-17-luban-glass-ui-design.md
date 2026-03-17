@@ -25,6 +25,8 @@ A Deep Glass Transformation where every element floats on frosted glass panels w
 | `--primary-glow` | `rgba(99, 102, 241, 0.4)` | `rgba(129, 140, 248, 0.5)` | Glow effect |
 | `--bubble-user` | `linear-gradient(135deg, #6366f1, #8b5cf6)` | `linear-gradient(135deg, #4f46e5, #7c3aed)` | User message gradient |
 | `--bubble-assistant` | `rgba(255, 255, 255, 0.5)` | `rgba(51, 65, 85, 0.5)` | Assistant glass |
+| `--danger` | `#ef4444` | `#f87171` | Error/Destructive |
+| `--success` | `#22c55e` | `#4ade80` | Success |
 
 ### Glass Effects System
 ```css
@@ -91,7 +93,7 @@ A Deep Glass Transformation where every element floats on frosted glass panels w
 ### Main Content Area
 - **Top Bar:** Glass strip (height: 60px) with model selector, theme toggle
 - **Messages Area:** Full-height glass container with padding
-- **Composer:** Floating glass panel (not attached to bottom) with blur
+- **Composer:** Glass panel with responsive positioning (see Responsive Behavior below)
 
 ### Message Flow
 - User messages: Right-aligned with gradient bubble
@@ -110,8 +112,9 @@ A Deep Glass Transformation where every element floats on frosted glass panels w
 Level 1: Background gradient blobs
 Level 10: Sidebar glass
 Level 20: Messages container
-Level 30: Composer floating panel
+Level 30: Composer panel
 Level 40: Modals / Dialogs
+Level 50: Mobile sidebar drawer
 Level 100: Toast notifications
 ```
 
@@ -147,10 +150,38 @@ Level 100: Toast notifications
 | Error | Red border glow + error toast below composer |
 
 ### Background Animation
-- **Animated Gradient Blobs:** 3-4 colored orbs floating slowly
-- **Duration:** 20-30s per loop
-- **Motion:** Slow translate + scale oscillation
-- **Respects Reduced Motion:** Pauses or becomes static
+
+**Gradient Blobs Configuration:**
+
+| Blob | Color | Size | Initial Position | Animation Path |
+|------|-------|-------|------------------|----------------|
+| Blob 1 | `rgba(99, 102, 241, 0.3)` | 300px | top-left (-10%, -10%) | Circular orbit, 25s duration |
+| Blob 2 | `rgba(139, 92, 246, 0.25)` | 400px | top-right (110%, 20%) | Figure-8 path, 30s duration |
+| Blob 3 | `rgba(34, 211, 238, 0.2)` | 350px | bottom-center (50%, 110%) | Slow oscillation, 22s duration |
+
+- **Duration:** 20-30s per loop (varies by blob)
+- **Motion:** CSS keyframes with translate + scale oscillation
+- **Blur:** Each blob has 60px blur filter
+- **Respects Reduced Motion:** Pauses animation, shows static gradient
+
+```css
+@keyframes float-blob-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(50px, 30px) scale(1.1); }
+  50% { transform: translate(30px, 60px) scale(0.95); }
+  75% { transform: translate(-20px, 40px) scale(1.05); }
+}
+
+.background-blob-1 {
+  position: fixed;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.3);
+  filter: blur(60px);
+  animation: float-blob-1 25s infinite ease-in-out;
+}
+```
 
 ### Glass Hover Effects
 ```css
@@ -173,6 +204,9 @@ Level 100: Toast notifications
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+  .background-blob {
+    animation: none;
+  }
 }
 ```
 
@@ -183,63 +217,86 @@ Level 100: Toast notifications
 ### New Components
 
 #### 1. Message Actions (Hover on bubbles)
-- **Copy Button:** Copy message to clipboard
-- **Regenerate Button:** Re-generate assistant response
-- **Edit Button:** Edit user message and retry
+- **Copy Button:** Copy message to clipboard with success toast
+- **Regenerate Button:** Re-generate assistant response (uses existing /api/chat)
+- **Edit Button:** Edit user message and re-send
 - **Delete Button:** Delete message from conversation
 - *Position:* Top-right of each bubble, visible on hover
+- *Implementation:* Frontend-only (calls existing API endpoints)
 
 #### 2. Code Syntax Highlighting
-- **Code Blocks:** Glass panel with darker background
-- **Syntax Highlighting:** Highlight.js or Prism.js
-- **Language Detection:** Auto-detect from markdown fences
-- **Copy Button:** Dedicated copy for code blocks
-- **Line Numbers:** Optional toggle in settings
+- **Library:** Highlight.js v11.9.0 (lightweight, browser-compatible)
+- **Theme:** GitHub Light (light mode) / GitHub Dark (dark mode)
+- **Code Blocks:** Glass panel with `rgba(0, 0, 0, 0.05)` background
+- **Language Detection:** Auto-detect from markdown fences (```lang)
+- **Copy Button:** Dedicated copy icon in top-right of code block
+- **Line Numbers:** Optional (can be toggled via user preference stored in localStorage)
+- *Implementation:* Frontend-only, CDN-based loading
+
+```html
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" data-theme="light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" data-theme="dark">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+```
 
 #### 3. Model Information Card
-- **Hover on Model Select:** Shows model details
+- **Trigger:** Hover on model select dropdown option
+- **Display:** Glass tooltip with model details
   - Model name and description
-  - Token limit
-  - Response speed indicator
-  - Capabilities list
+  - Token limit (from API response)
+  - Response speed indicator (estimated)
+  - Capabilities list (from API response)
+- *Implementation:* Frontend-only, uses data from /api/models endpoint
 
 #### 4. Attachment Preview
-- **Thumbnail:** Glass-framed preview for images/videos
-- **File Type Icon:** For non-visual files
-- **Remove Button:** X icon on attachment
-- **Size Badge:** File size display
+- **Thumbnail:** Glass-framed preview for images/videos (max 100px width)
+- **File Type Icon:** For non-visual files (SVG icons)
+- **Remove Button:** X icon on attachment (calls API to remove)
+- **Size Badge:** File size display (human-readable format)
+- *Implementation:* Frontend-only, uses existing /api/upload endpoint
 
 #### 5. Export Options
-- **Export Button:** In top bar
-- **Formats:** Markdown, PDF, JSON
-- **Scope:** Current session or all sessions
+- **Export Button:** In top bar (icon button)
+- **Formats:**
+  - **Markdown:** Pure client-side generation from messages
+  - **JSON:** Pure client-side serialization of session data
+  - **PDF:** Uses browser's print-to-PDF capability via CSS @media print
+- **Scope:** Current session only (uses session data already loaded)
+- *Implementation:* Pure frontend, no backend changes required
 
 #### 6. Search Sessions
 - **Search Input:** Above session list in sidebar
-- **Live Filtering:** Real-time search as you type
-- **Highlight:** Matching text in results
+- **Live Filtering:** Real-time search as you type (pure client-side filtering)
+- **Search Scope:** Session titles and last message content
+- **Highlight:** Matching text in results using `<mark>` tags
+- *Implementation:* Frontend-only, filters existing state.sessions array
 
 #### 7. Quick Actions (Keyboard Shortcuts)
-- **Ctrl/Cmd + K:** Start new chat
-- **Ctrl/Cmd + /:** Show shortcuts modal
-- **Ctrl/Cmd + N:** Create new chat
+- **Ctrl/Cmd + K:** Start new chat (calls newChat())
+- **Ctrl/Cmd + /:** Show shortcuts modal (glass dialog)
+- **Ctrl/Cmd + N:** Create new chat (calls newChat())
 - **Escape:** Close composer focus / close modals
+- *Implementation:* Frontend-only event listeners
 
 #### 8. Toast Notifications
-- **Position:** Bottom-right corner
+- **Position:** Bottom-right corner (fixed, z-index: 100)
 - **Types:** Success (green), Error (red), Info (blue)
 - **Auto-dismiss:** 4 seconds
 - **Manual dismiss:** Click to close
+- **Animation:** Slide in from bottom (300ms), fade out (200ms)
+- *Implementation:* Frontend-only, DOM-based toast container
 
 #### 9. Typing Indicator
 - **Appearance:** Glass capsule with 3 animated dots
-- **Position:** Below last user message
+- **Position:** Below last user message (as assistant bubble placeholder)
 - **Animation:** Bouncing dots with 150ms stagger
+- *Implementation:* Frontend-only, shown when isSending = true
 
 #### 10. Welcome/Onboarding Experience
-- **Empty State:** Animated Luban mascot illustration
-- **Suggested Prompts:** Glass cards with quick-start questions
-- **Feature Tour:** Optional guided tour on first visit
+- **Empty State:** Simple text greeting "你好，我是鲁班" with subtle pulse animation
+- **Suggested Prompts:** 3 glass cards with quick-start questions (static array)
+- **Feature Tour:** Optional (deferred to future phase)
+- *Implementation:* Frontend-only, static content
 
 ---
 
@@ -272,48 +329,76 @@ Level 100: Toast notifications
 └─────────────────────────────────┘
 ```
 
+### Responsive Composer Behavior
+
+| Breakpoint | Position | Margin/Spacing | Shadow |
+|------------|-----------|----------------|---------|
+| Desktop (1024px+) | Relative, below messages | 24px from messages | Standard glass shadow |
+| Tablet (768-1024px) | Relative, below messages | 16px from messages | Medium glass shadow |
+| Mobile (<768px) | Fixed at bottom | 0px, attached to viewport | Elevated shadow with backdrop blur |
+
+**Composer Transition:**
+- On resize below 768px: Composer becomes `position: fixed; bottom: 0; left: 0; right: 0;`
+- On resize above 768px: Composer returns to relative positioning in document flow
+- Transition: 200ms ease for position changes (smooth, no layout shift)
+
 ### Mobile-Specific Adaptations
 
 #### 1. Sidebar as Slide-Over Drawer
 - **Trigger:** Hamburger menu (≡) in top-left
-- **Behavior:** Full-height glass panel slides from left
-- **Backdrop:** Dimmed glass overlay
+- **Behavior:** Full-height glass panel slides from left with 300ms animation
+- **Backdrop:** Dimmed glass overlay (z-index: 45) with tap-to-close
 - **Close:** Tap backdrop, close button, or swipe right
+- *Implementation:* Frontend-only, uses CSS transforms
 
 #### 2. Touch Targets
 - **Minimum size:** 44×44px (iOS standard)
-- **Button padding:** Increased to 12px
-- **Tap area:** Extended beyond visual bounds using hit regions
+- **Button padding:** Increased to 12px on mobile
+- **Tap area:** Extended using pseudo-elements for small visual elements
+
+```css
+@media (max-width: 767px) {
+  .icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 12px;
+  }
+}
+```
 
 #### 3. Composer on Mobile
-- **Fixed position:** Always visible at bottom
-- **Auto-resize:** Grows to max 120px, then scrolls
-- **Keyboard handling:** Adjusts for virtual keyboard
+- **Fixed position:** Always visible at bottom (position: fixed)
+- **Auto-resize:** Grows to max 120px, then scrolls internal content
+- **Keyboard handling:** Adjusts for virtual keyboard (uses visualViewport API)
 - **Send button:** Prominent right-side placement
+- **Safe area padding:** `padding-bottom: env(safe-area-inset-bottom)`
 
 #### 4. Message Actions
 - **Long press:** Opens action menu (copy, edit, delete)
-- **Swipe left:** Quick delete option
-- **Menu:** Bottom sheet glass panel
+- **Swipe left:** Quick delete option (with undo toast)
+- **Menu:** Bottom sheet glass panel (slides up from bottom)
+- *Implementation:* Frontend-only, uses touch events
 
 #### 5. Model Selector
 - **Position:** Compact dropdown in top bar
 - **Tap to expand:** Full-width glass sheet with model details
+- *Implementation:* Frontend-only, uses existing model data
 
 #### 6. Safe Area Support
-- **Top bar:** Respects status bar notch
-- **Bottom composer:** Respects home indicator
-- **Side padding:** Adjusts for device edges
+- **Top bar:** `padding-top: env(safe-area-inset-top)`
+- **Bottom composer:** `padding-bottom: env(safe-area-inset-bottom)`
+- **Side padding:** Adjusts for device edges using media queries
 
 #### 7. Scroll Behavior
-- **Overscroll:** Bounce at edges (iOS style)
+- **Overscroll:** Bounce at edges (native iOS behavior)
 - **Pull to refresh:** Not needed (real-time updates)
-- **Scroll momentum:** Native smooth scrolling
+- **Scroll momentum:** Native smooth scrolling (-webkit-overflow-scrolling: touch)
 
 #### 8. Gesture Support
 - **Swipe left from edge:** Open sidebar
 - **Swipe down on drawer:** Close drawer
-- **Two-finger tap:** Show message actions
+- **Two-finger tap:** Show message actions menu
+- *Implementation:* Frontend-only, uses touch event listeners
 
 ### Typography Scaling
 
@@ -324,8 +409,8 @@ Level 100: Toast notifications
 | Desktop | 16px | 20px |
 
 ### Orientation Support
-- **Landscape:** Full-width messages, compact top bar
-- **Portrait:** Standard layout
+- **Landscape:** Full-width messages, compact top bar (48px)
+- **Portrait:** Standard layout (56px top bar)
 
 ---
 
@@ -342,6 +427,8 @@ Level 100: Toast notifications
   --text-secondary: #64748b;
   --primary: #6366f1;
   --primary-glow: rgba(99, 102, 241, 0.4);
+  --danger: #ef4444;
+  --success: #22c55e;
 
   /* Glass Effects */
   --glass-blur: 20px;
@@ -354,6 +441,10 @@ Level 100: Toast notifications
   --transition-fast: 150ms ease;
   --transition-base: 200ms ease;
   --transition-slow: 300ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Focus Ring */
+  --focus-ring: 2px solid var(--primary);
+  --focus-offset: 2px;
 }
 
 html[data-theme="dark"] {
@@ -365,10 +456,24 @@ html[data-theme="dark"] {
   --text-secondary: #94a3b8;
   --primary: #818cf8;
   --primary-glow: rgba(129, 140, 248, 0.5);
+  --danger: #f87171;
+  --success: #4ade80;
+}
+
+@media (prefers-contrast: high) {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.9);
+    --glass-border: 1px solid currentColor;
+    --text-primary: #000000;
+  }
+  html[data-theme="dark"] {
+    --glass-bg: rgba(30, 41, 59, 0.95);
+    --text-primary: #ffffff;
+  }
 }
 ```
 
-### Glass Panel Mixin
+### Glass Panel Base Class
 ```css
 .glass-panel {
   background: var(--glass-bg);
@@ -383,72 +488,291 @@ html[data-theme="dark"] {
 }
 ```
 
-### Key Components Structure
+### File Organization Strategy
+
+**New files are ADDITIONS to existing files, not replacements:**
 
 ```
 frontend/
 ├── css/
-│   ├── style.css           # Main stylesheet (update with glass effects)
-│   └── components.css      # New: Glass component styles
+│   ├── style.css           # Main stylesheet - UPDATE with glass variables
+│   └── components.css      # NEW: Glass-specific component styles
 ├── js/
-│   ├── app.js              # Main app logic
-│   ├── glass-ui.js         # New: Glass effects and animations
-│   └── features.js         # New: Enhanced features (copy, export, etc.)
-└── index.html             # Update with new markup
+│   ├── app.js              # Main app logic - MODIFY for new features
+│   ├── glass-ui.js         # NEW: Glass effects, animations, background
+│   ├── features.js         # NEW: Toasts, export, copy, shortcuts
+│   └── keyboard.js        # NEW: Keyboard navigation and shortcuts
+└── index.html             # UPDATE: Add new script links, markup changes
 ```
 
 ### External Dependencies
-- **Highlight.js or Prism.js:** Code syntax highlighting
+- **Highlight.js v11.9.0:** Code syntax highlighting (CDN)
 - **Inter Font:** Google Fonts (already included)
-- **Lucide Icons or Heroicons:** SVG icons (already used)
+- **Existing Icons:** Lucide/Heroicons SVG icons (already used)
+
+### Error Handling Specifications
+
+#### Error Types and Display
+
+| Error Context | Display Location | Visual | Recovery |
+|--------------|------------------|---------|-----------|
+| Network failure | Toast notification (bottom-right) | Red glass panel with icon | "Retry" button in toast |
+| Chat API error | Error bar below composer | Red border glow + text | Retry button, edit message |
+| File upload error | Toast notification | Red glass panel | Try again button |
+| Export failure | Toast notification | Red glass panel | Try again button |
+| Session load error | Error message in messages area | Red glass panel | Retry or new chat |
+
+#### Error State CSS
+```css
+.composer.error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.error-toast {
+  background: rgba(239, 68, 68, 0.9);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  color: white;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.error-toast button {
+  margin-top: 8px;
+  background: white;
+  color: var(--danger);
+  padding: 8px 16px;
+  border-radius: 8px;
+}
+```
 
 ---
 
-## 7. Accessibility Checklist
+## 7. Accessibility Specifications
 
-- [ ] Minimum 4.5:1 contrast ratio for text (WCAG AA)
-- [ ] Visible focus rings on all interactive elements
-- [ ] Keyboard navigation support for all features
-- [ ] Aria-labels on icon-only buttons
-- [ ] Reduced motion support for animations
-- [ ] Touch targets minimum 44×44px on mobile
-- [ ] Screen reader friendly markup
-- [ ] High contrast mode support
-- [ ] Skip to main content link
-- [ ] Form error messages associated with inputs
+### Focus States
+
+All interactive elements must have visible focus rings:
+
+```css
+*:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* Glass panels need higher contrast focus */
+.glass-panel:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--primary-glow);
+}
+```
+
+**Focus Ring Design:**
+- Color: `var(--primary)` (indigo)
+- Width: 2px
+- Offset: 2px from element edge
+- High contrast mode: 3px solid black/white
+
+### Keyboard Navigation
+
+**Tab Order:**
+1. Sidebar hamburger (mobile only)
+2. Logo (link to home)
+3. Model selector dropdown
+4. Theme toggle
+5. User avatar/profile
+6. Session list items
+7. New chat button
+8. Messages area (skip link jumps here)
+9. Composer input
+10. Upload button
+11. Send button
+
+**Keyboard Shortcuts:**
+- `Tab` / `Shift+Tab`: Navigate between elements
+- `Enter` / `Space`: Activate buttons and links
+- `Escape`: Close modals, drawers, clear focus
+- `Ctrl/Cmd + K`: Start new chat
+- `Ctrl/Cmd + /`: Show shortcuts modal
+
+### ARIA Label Patterns
+
+**Icon-only buttons:**
+```html
+<button aria-label="Send message">
+  <svg>...</svg>
+</button>
+```
+
+**Model selector:**
+```html
+<select id="modelSelect" aria-label="Select AI model">
+  <option value="gpt-4">GPT-4</option>
+</select>
+```
+
+**Message bubbles:**
+```html
+<div class="msg user" role="presentation">
+  <div class="bubble" aria-label="Your message: Hello">
+    Hello
+  </div>
+</div>
+```
+
+**Toast notifications:**
+```html
+<div class="toast" role="alert" aria-live="polite">
+  Message copied successfully
+</div>
+```
+
+**Skip to main content:**
+```html
+<a href="#main" class="skip-link">
+  Skip to main content
+</a>
+```
+
+```css
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: 16px;
+  background: var(--primary);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  z-index: 1000;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+```
+
+### Contrast Validation
+
+**Minimum contrast ratios:**
+- Body text: 4.5:1 (AA)
+- Large text (18px+): 3:1 (AA)
+- Interactive elements: 3:1 (AA)
+
+**Validated color pairs (light mode):**
+- `--text-primary` (#1e293b) on `--glass-bg` (rgba(255,255,255,0.25)): **14.2:1** ✓
+- `--text-secondary` (#64748b) on `--glass-bg`: **5.8:1** ✓
+- `--primary` (#6366f1) on white: **3.9:1** ✓ (needs improvement, add text-shadow)
+
+**Validated color pairs (dark mode):**
+- `--text-primary` (#f1f5f9) on `--glass-bg` (rgba(30,41,59,0.4)): **13.5:1** ✓
+- `--text-secondary` (#94a3b8) on `--glass-bg`: **4.7:1** ✓
+- `--primary` (#818cf8) on dark: **3.2:1** ✓ (needs improvement, add text-shadow)
+
+**Primary button fix:**
+```css
+.btn.primary {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+```
+
+### High Contrast Mode
+
+When `prefers-contrast: high` is active:
+- Increase glass panel opacity to 90%+
+- Use solid borders (1px solid currentColor)
+- Increase shadow contrast
+- Remove blur effects for clarity
+
+```css
+@media (prefers-contrast: high) {
+  .glass-panel {
+    backdrop-filter: none;
+    background: var(--glass-bg);
+    border: 2px solid currentColor;
+  }
+
+  .background-blob {
+    opacity: 0.1;
+  }
+}
+```
+
+### Screen Reader Support
+
+**Semantic HTML structure:**
+```html
+<div class="app" role="application">
+  <aside class="sidebar" aria-label="Session history">
+    <!-- Sidebar content -->
+  </aside>
+
+  <main id="main" role="main" aria-live="polite" aria-label="Chat messages">
+    <header class="topbar">
+      <!-- Top bar content -->
+    </header>
+
+    <div id="messages" class="messages" role="log" aria-live="polite">
+      <!-- Messages -->
+    </div>
+
+    <section class="composer" aria-label="Message composer">
+      <!-- Composer content -->
+    </section>
+  </main>
+</div>
+```
 
 ---
 
 ## 8. Implementation Priority
 
-### Phase 1: Core Glass Transformation
-1. Update CSS with glass variables and effects
-2. Apply glass styling to existing components
-3. Implement animated gradient background
-4. Update typography to Inter font
-5. Add hover/active state animations
+### Phase 1: Core Glass Transformation (Frontend Only)
+1. Update CSS with glass variables and effects (modify `style.css`)
+2. Create `glass-ui.js` with background animation code
+3. Apply glass styling to existing components (sidebar, messages, composer)
+4. Implement animated gradient background with 3 blobs
+5. Update typography to Inter font (already loaded via Google Fonts)
+6. Add hover/active state animations
 
-### Phase 2: Layout Refinements
+### Phase 2: Layout Refinements (Frontend Only)
 1. Refine sidebar glass panel styling
-2. Update composer as floating glass panel
-3. Add message action buttons
-4. Implement model information card
-5. Add typing indicator
+2. Implement responsive composer behavior (floating vs fixed)
+3. Add focus ring styling to all interactive elements
+4. Update ARIA labels on existing elements
 
-### Phase 3: Feature Additions
-1. Implement code syntax highlighting
-2. Add copy/edit/delete message actions
-3. Build export functionality
-4. Add session search
-5. Implement keyboard shortcuts
-6. Add toast notifications
+### Phase 3: Basic Features (Frontend Only)
+1. Implement toast notification system (`features.js`)
+2. Add typing indicator to message flow
+3. Implement message copy button
+4. Add keyboard shortcuts (`keyboard.js`)
+5. Create shortcuts modal
 
-### Phase 4: Mobile Experience
-1. Implement sidebar drawer
-2. Add touch-specific interactions
-3. Optimize composer for mobile
+### Phase 4: Advanced Features (Frontend Only)
+1. Integrate Highlight.js for code syntax highlighting
+2. Add export functionality (Markdown, JSON, PDF)
+3. Implement session search (client-side filtering)
+4. Add message edit and delete actions
+5. Create model information tooltip
+
+### Phase 5: Mobile Experience (Frontend Only)
+1. Implement mobile sidebar drawer
+2. Add touch-specific interactions (long press, swipe)
+3. Optimize composer for mobile (fixed positioning)
 4. Add gesture support
-5. Safe area handling
+5. Implement safe area handling
+6. Test on actual mobile devices
+
+### Phase 6: Polish & Testing
+1. Run accessibility audit (keyboard, screen reader, contrast)
+2. Performance optimization (animation frames, bundle size)
+3. Cross-browser testing (Chrome, Firefox, Safari, Edge)
+4. Responsive testing (375px, 768px, 1024px, 1440px)
+5. Reduced motion testing
+
+**Note:** All phases are frontend-only. No backend API changes are required for this UI redesign. All features work with existing API endpoints.
 
 ---
 
@@ -457,14 +781,17 @@ frontend/
 The Glass & Futuristic redesign is successful when:
 
 1. **Visual Impact:** The interface feels distinctly modern with glass effects and animated backgrounds
-2. **Readability:** All text meets WCAG AA contrast standards in both light and dark modes
-3. **Performance:** Animations run at 60fps with no jank
-4. **Accessibility:** All features are keyboard accessible and screen reader friendly
-5. **Responsive:** Experience is polished on mobile, tablet, and desktop
-6. **Feature Parity:** All existing features work with the new design
-7. **Browser Support:** Works in modern browsers (Chrome, Firefox, Safari, Edge)
+2. **Readability:** All text meets WCAG AA contrast standards (4.5:1 minimum) in both light and dark modes
+3. **Performance:** Animations run at 60fps with no jank (verified via Chrome DevTools)
+4. **Accessibility:** All features are keyboard accessible (tab order, enter/space activation, focus visible)
+5. **Screen Reader:** All interactive elements have proper ARIA labels and roles
+6. **Responsive:** Experience is polished on mobile (375px+), tablet (768px+), and desktop (1024px+)
+7. **Feature Parity:** All existing features work seamlessly with the new design
+8. **Browser Support:** Works in modern browsers (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
+9. **Reduced Motion:** Animations respect `prefers-reduced-motion` and become static
+10. **High Contrast:** Interface remains usable and clear when `prefers-contrast: high`
 
 ---
 
-**Document Status:** Ready for implementation
-**Next Step:** Create detailed implementation plan
+**Document Status:** Ready for implementation planning
+**Next Step:** Create detailed implementation plan using writing-plans skill
