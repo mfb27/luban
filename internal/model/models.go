@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+
 type Session struct {
 	ID        string    `gorm:"type:varchar(36);primaryKey" json:"id"`
 	UserID    string    `gorm:"type:varchar(36);index;not null" json:"user_id"`
@@ -26,15 +27,19 @@ type User struct {
 	Email        string    `gorm:"type:varchar(128);uniqueIndex;not null" json:"email"`
 	PasswordHash string    `gorm:"type:varchar(255);not null" json:"-"` // Hide from JSON
 	AvatarURL    string    `gorm:"type:varchar(512)" json:"avatar_url"`
+	Status       string    `gorm:"type:varchar(16);default:'active'" json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type Model struct {
-	ID        string    `gorm:"type:varchar(64);primaryKey" json:"id"`
-	Name      string    `gorm:"type:varchar(128);not null" json:"name"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string    `gorm:"type:varchar(64);primaryKey" json:"id"`
+	Name        string    `gorm:"type:varchar(128);not null" json:"name"`
+	ModelID     string    `gorm:"type:varchar(128);uniqueIndex" json:"model_id"`
+	Status      string    `gorm:"type:varchar(16);default:'active'" json:"status"`
+	Description string    `gorm:"type:text" json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type Attachment struct {
@@ -45,4 +50,5 @@ type Attachment struct {
 	Type      string    `gorm:"type:varchar(16);index;not null" json:"type"` // image/video
 	CreatedAt time.Time `json:"created_at"`
 }
+
 

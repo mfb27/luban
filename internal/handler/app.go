@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mfb27/luban/internal/admin"
 	"github.com/mfb27/luban/internal/config"
 	"github.com/mfb27/luban/internal/middleware"
 	"github.com/mfb27/luban/internal/model"
@@ -11,11 +14,13 @@ import (
 	"github.com/mfb27/luban/internal/zhipu"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 type App struct {
-	Engine *gin.Engine
+	Engine           *gin.Engine
+	adminAuthService *admin.AdminAuthService
 
 	cfg   *config.Config
 	log   *zap.Logger
@@ -37,7 +42,7 @@ type AppDeps struct {
 }
 
 func NewApp(deps AppDeps) (*App, error) {
-	if err := deps.DB.AutoMigrate(&model.Session{}, &model.Message{}, &model.User{}, &model.Model{}, &model.Attachment{}); err != nil {
+	if err := deps.DB.AutoMigrate(&model.Session{}, &model.Message{}, &model.User{}, &model.Model{}, &model.Attachment{}, &model.Admin{}); err != nil {
 		return nil, err
 	}
 
@@ -49,7 +54,7 @@ func NewApp(deps AppDeps) (*App, error) {
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	engine.Use(middleware.WithRequestID(deps.Log))
-	engine.Use(gin.Logger())
+	engine.Use(middleware.RequestLogger(deps.Log))
 
 	// Use simple CORS middleware for development
 	engine.Use(middleware.SimpleCORSMiddleware())
@@ -60,20 +65,24 @@ func NewApp(deps AppDeps) (*App, error) {
 		BaseURL: deps.Cfg.ZhipuAI.BaseURL,
 	})
 
+	// Create admin auth service
+	adminAuthService := admin.NewAdminAuthService(deps.DB, deps.Cfg.Admin.SecretKey)
+
 	app := &App{
-		Engine:          engine,
-		cfg:             deps.Cfg,
-		log:             deps.Log,
-		db:              deps.DB,
-		redis:           deps.Redis,
-		minio:           deps.MinIO,
-		zhipu:           zhipuClient,
-		minioBucket:     deps.MinIO.Bucket,
-		minioPublicBase: deps.MinIO.PublicBaseURL,
+		Engine:           engine,
+		adminAuthService: adminAuthService,
+		cfg:              deps.Cfg,
+		log:              deps.Log,
+		db:               deps.DB,
+		redis:            deps.Redis,
+		minio:            deps.MinIO,
+		zhipu:            zhipuClient,
+		minioBucket:      deps.MinIO.Bucket,
+		minioPublicBase:  deps.MinIO.PublicBaseURL,
 	}
 
 	app.registerRoutes()
-	app.seedIfNeeded()
+	app.seedAdminIfNeeded()
 
 	return app, nil
 }
@@ -113,13 +122,18 @@ func (a *App) registerRoutes() {
 		}
 	}
 
+	// Register admin routes
+	a.registerAdminRoutes()
+
 	// static
-	// staticDir := a.cfg.Web.StaticDir
-	// if staticDir == "" {
-	// 	staticDir = "./frontend"
-	// }
-	// a.Engine.Static("/assets", filepath.Join(staticDir, "assets"))
-	// a.Engine.StaticFile("/", filepath.Join(staticDir, "index.html"))
+	staticDir := a.cfg.Web.StaticDir
+	if staticDir == "" {
+		staticDir = "./frontend"
+	}
+
+	// Serve main frontend
+	a.Engine.StaticFile("/", "./frontend/index.html")
+	a.Engine.Static("/assets", "./frontend/assets")
 }
 
 // migrateSessions adds user_id to existing sessions
@@ -144,4 +158,44 @@ func migrateSessions(db *gorm.DB) error {
 	}
 
 	return nil
+}
+
+// seedAdminIfNeeded 如果没有管理员则创建初始管理员
+func (a *App) seedAdminIfNeeded() {
+	var count int64
+	if err := a.db.Model(&model.Admin{}).Count(&count).Error; err != nil {
+		a.log.Error("Failed to check admin count", zap.Error(err))
+		return
+	}
+
+	if count == 0 {
+		// 创建初始管理员
+		admin := model.Admin{
+			ID:     generateAdminID(),
+			Name:   a.cfg.Admin.InitialAdmin.Name,
+			Email:  a.cfg.Admin.InitialAdmin.Email,
+			Status: "active",
+		}
+
+		// 加密密码
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(a.cfg.Admin.InitialAdmin.Password), bcrypt.DefaultCost)
+		if err != nil {
+			a.log.Error("Failed to hash admin password", zap.Error(err))
+			return
+		}
+		admin.Password = string(hashedPassword)
+
+		if err := a.db.Create(&admin).Error; err != nil {
+			a.log.Error("Failed to create initial admin", zap.Error(err))
+		} else {
+			a.log.Info("Created initial admin user", zap.String("email", admin.Email))
+		}
+	}
+}
+
+// generateAdminID 生成管理员ID
+func generateAdminID() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return "admin_" + hex.EncodeToString(bytes)
 }

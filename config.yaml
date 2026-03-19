@@ -27,5 +27,14 @@ minio:
   public_base_url: http://127.0.0.1:9000
 
 zhipuai:
-  api_key: 7fd85e544194470e9cec7456dfa3cf3f.6DVLuIcjBLF0BmTS
+  api_key: 79cfc89b64ea45f8b5ab83368844e32a.YgAMAzBH2uZPeA5N
   api_url: https://api.zhipuai.com/v1/chat/completions
+
+admin:
+  # JWT secret key
+  secret_key: your-secret-key-change-this-in-production
+  # Initial admin account (will be created on first startup if not exists)
+  initial_admin:
+    name: Admin
+    email: admin@example.com
+    password: admin123

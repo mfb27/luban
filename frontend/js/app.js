@@ -137,12 +137,12 @@ async function loadModels() {
   els.modelSelect.innerHTML = "";
   for (const m of models) {
     const opt = document.createElement("option");
-    opt.value = m.id;
+    opt.value = m.model_id;  // Use model_id instead of id for the actual model identifier
     opt.textContent = m.name;
     els.modelSelect.appendChild(opt);
   }
   if (!state.currentModelId && models.length) {
-    state.currentModelId = models[0].id;
+    state.currentModelId = models[0].model_id;  // Use model_id instead of id
     els.modelSelect.value = state.currentModelId;
   }
   renderTopbar();

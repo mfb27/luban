@@ -16,7 +16,15 @@
       "Bash(taskkill /F /PID 16740)",
       "Bash(taskkill //F //PID 16740)",
       "Bash(docker exec:*)",
-      "Bash(netstat -ano | findstr :9000)"
+      "Bash(netstat -ano | findstr :9000)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(start index.html)",
+      "Bash(./luban server:*)",
+      "Bash(ls:*)"
     ]
   }
 }

@@ -15,6 +15,7 @@ type Config struct {
 	MinIO   MinIOConfig   `mapstructure:"minio"`
 	Web     WebConfig     `mapstructure:"web"`
 	ZhipuAI ZhipuAIConfig `mapstructure:"zhipuai"`
+	Admin   AdminConfig   `mapstructure:"admin"`
 }
 
 type ServerConfig struct {
@@ -52,6 +53,17 @@ type MinIOConfig struct {
 type ZhipuAIConfig struct {
 	APIKey  string `mapstructure:"api_key"`
 	BaseURL string `mapstructure:"base_url"`
+}
+
+type AdminConfig struct {
+	SecretKey      string               `mapstructure:"secret_key"`
+	InitialAdmin   InitialAdminConfig   `mapstructure:"initial_admin"`
+}
+
+type InitialAdminConfig struct {
+	Name     string `mapstructure:"name"`
+	Email    string `mapstructure:"email"`
+	Password string `mapstructure:"password"`
 }
 
 func Load() (*Config, error) {

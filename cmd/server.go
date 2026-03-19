@@ -18,7 +18,30 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
+
+// NewGormLogger 创建一个使用zap的GORM日志记录器
+func NewGormLogger(log *zap.Logger) gormlogger.Interface {
+	return gormlogger.New(
+		&gormLoggerWriter{log: log},
+		gormlogger.Config{
+			SlowThreshold:             200 * time.Millisecond,
+			LogLevel:                  gormlogger.Info,
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  false,
+		},
+	)
+}
+
+// gormLoggerWriter 实现GORM日志写入器，使用zap
+type gormLoggerWriter struct {
+	log *zap.Logger
+}
+
+func (l *gormLoggerWriter) Printf(format string, args ...interface{}) {
+	l.log.Info(fmt.Sprintf(format, args...))
+}
 
 var serverCmd = &cobra.Command{
 	Use:   "server",
@@ -35,7 +58,9 @@ var serverCmd = &cobra.Command{
 		}
 		defer func() { _ = log.Sync() }()
 
-		db, err := gorm.Open(mysql.Open(cfg.MySQL.DSN), &gorm.Config{})
+		db, err := gorm.Open(mysql.Open(cfg.MySQL.DSN), &gorm.Config{
+			Logger: NewGormLogger(log),
+		})
 		if err != nil {
 			return fmt.Errorf("open mysql: %w", err)
 		}

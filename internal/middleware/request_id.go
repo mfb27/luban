@@ -26,9 +26,9 @@ func WithRequestID(log *zap.Logger) gin.HandlerFunc {
 		// Add request ID to response headers
 		c.Header(RequestIDHeader, requestID)
 
-		// Add request ID to logger for this request
-		log = log.With(zap.String("request_id", requestID))
-		c.Set("logger", log)
+		// Create a new logger with request ID for this request
+		requestLog := log.With(zap.String("request_id", requestID))
+		c.Set("logger", requestLog)
 
 		// Continue with the next handler
 		c.Next()

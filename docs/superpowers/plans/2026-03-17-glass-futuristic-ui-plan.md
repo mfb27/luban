@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Transform the Luban chat interface into a Glass & Futuristic design with animated gradient backgrounds, frosted glass panels, and modern interactions while maintaining all existing functionality.
+**Goal:** Transform Luban chat interface into a Glass & Futuristic design with animated gradient backgrounds, frosted glass panels, and modern interactions while maintaining all existing functionality.
 
 **Architecture:** Frontend-only transformation - no backend API changes required. All new features work with existing API endpoints with graceful degradation for missing capabilities. The design uses CSS custom properties (variables) for theming and glass effects that can be applied progressively.
 
@@ -56,6 +56,10 @@ Replace lines 1-31 with:
   --success: #22c55e;
   --bg-sidebar: rgba(255, 255, 255, 0.15);
 
+  /* Message Bubble Colors */
+  --bubble-user: linear-gradient(135deg, #6366f1, #8b5cf6);
+  --bubble-assistant: rgba(255, 255, 255, 0.5);
+
   /* Glass Effects */
   --glass-blur: 20px;
   --glass-blur-heavy: 40px;
@@ -85,6 +89,10 @@ html[data-theme="dark"] {
   --danger: #f87171;
   --success: #4ade80;
   --bg-sidebar: rgba(30, 41, 59, 0.3);
+
+  /* Message Bubble Colors - Dark Mode */
+  --bubble-user: linear-gradient(135deg, #4f46e5, #7c3aed);
+  --bubble-assistant: rgba(51, 65, 85, 0.5);
 }
 ```
 
@@ -102,7 +110,7 @@ Expected: Colors switch to dark mode palette
 
 ```bash
 git add frontend/css/style.css
-git commit -m "feat: replace CSS variables with glass system"
+git commit -m "feat: replace CSS variables with glass system including bubble colors"
 ```
 
 ---
@@ -308,6 +316,19 @@ git commit -m "feat: add reduced motion support"
   flex-direction: column;
   padding: 16px 12px;
   gap: 16px;
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Sidebar hover effect - lift up */
+.sidebar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px var(--glass-shadow-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar:hover {
+    transform: none;
+  }
 }
 ```
 
@@ -325,7 +346,7 @@ Expected: Sidebar glass effect persists
 
 ```bash
 git add frontend/css/style.css
-git commit -m "style: apply glass effect to sidebar"
+git commit -m "style: apply glass effect to sidebar with hover lift"
 ```
 
 ---
@@ -339,23 +360,48 @@ git commit -m "style: apply glass effect to sidebar"
 
 ```css
 .session-item {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--glass-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
-  padding: 10px;
+  padding: 10px 10px;
   display: grid;
   gap: 4px;
   cursor: pointer;
   transition: all var(--transition-base);
+}
+
+/* Session card hover effect - lift and glow */
+.session-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px var(--glass-shadow-glow);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.session-item.active {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--primary-glow);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.session-item:active {
+  transform: translateY(0);
+  box-shadow: var(--glass-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-item:hover {
+    transform: none;
+  }
 }
 ```
 
 - [ ] **Step 2: Test session hover**
 
 Hover over session in sidebar
-Expected: Smooth hover animation
+Expected: Smooth hover animation with lift
 
 - [ ] **Step 3: Test active state**
 
@@ -366,7 +412,7 @@ Expected: Active session has visual indication
 
 ```bash
 git add frontend/css/style.css
-git commit -m "style: apply glass effect to session cards"
+git commit -m "style: apply glass effect to session cards with hover effects"
 ```
 
 ---
@@ -392,8 +438,13 @@ git commit -m "style: apply glass effect to session cards"
   transition: box-shadow var(--transition-base), transform var(--transition-base);
 }
 
+/* Message bubble hover - subtle shadow increase */
+.bubble:hover {
+  box-shadow: 0 12px 24px var(--glass-shadow-glow);
+}
+
 .msg.user .bubble {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--bubble-user);
   color: #ffffff;
   margin-left: auto;
   border-radius: 18px 18px 4px 18px;
@@ -402,24 +453,17 @@ git commit -m "style: apply glass effect to session cards"
 }
 
 .msg.assistant .bubble {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-  color: #1e293b;
+  background: var(--bubble-assistant);
+  color: var(--text-primary);
   margin-right: auto;
   border-radius: 18px 18px 18px 4px;
-}
-
-html[data-theme="dark"] .msg.assistant .bubble {
-  background: rgba(51, 65, 85, 0.5);
-  color: #f1f5f9;
 }
 ```
 
 - [ ] **Step 2: Test message rendering**
 
 Open a chat with messages
-Expected: Messages show glass/gradient effects
+Expected: Messages show glass/gradient effects using CSS variables
 
 - [ ] **Step 3: Test bubble hover**
 
@@ -430,7 +474,7 @@ Expected: Subtle shadow increase
 
 ```bash
 git add frontend/css/style.css
-git commit -m "style: apply glass effect to message bubbles"
+git commit -m "style: apply glass effect to message bubbles using CSS variables"
 ```
 
 ---
@@ -453,6 +497,17 @@ git commit -m "style: apply glass effect to message bubbles"
   align-items: center;
   gap: 12px;
   padding: 16px 18px;
+}
+
+/* Top bar hover effect */
+.topbar:hover {
+  box-shadow: 0 4px 12px var(--glass-shadow-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar:hover {
+    box-shadow: none;
+  }
 }
 ```
 
@@ -518,6 +573,17 @@ html[data-theme="dark"] .composer {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-glow);
 }
+
+/* Composer hover effect */
+.composer-shell:hover {
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-shell:hover {
+    border-color: inherit;
+  }
+}
 ```
 
 - [ ] **Step 2: Test composer focus**
@@ -534,7 +600,7 @@ Expected: Glass effect maintained
 
 ```bash
 git add frontend/css/style.css
-git commit -m "style: apply glass effect to composer"
+git commit -m "style: apply glass effect to composer with hover effects"
 ```
 
 ---
@@ -553,11 +619,17 @@ git commit -m "style: apply glass effect to composer"
   color: #ffffff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   box-shadow: var(--glass-shadow-glow);
+  transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .btn.primary:hover:not(:disabled) {
   background: var(--primary-2);
+  transform: scale(1.05);
   box-shadow: 0 0 0 4px var(--primary-glow);
+}
+
+.btn.primary:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 html[data-theme="dark"] .btn.primary {
@@ -569,23 +641,44 @@ html[data-theme="dark"] .btn.primary {
 html[data-theme="dark"] .btn.primary:hover:not(:disabled) {
   background: var(--primary-2);
 }
+
+html[data-theme="dark"] .btn.primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.primary:hover:not(:disabled),
+  .btn.primary:active:not(:disabled) {
+    transform: none;
+  }
+}
 ```
 
 - [ ] **Step 2: Test primary button rendering**
 
 View primary buttons (new chat, send)
-Expected: High contrast with text-shadow
+Expected: High contrast with text-shadow, scale on hover
 
 - [ ] **Step 3: Test button hover**
 
 Hover over primary button
-Expected: Glow effect intensifies
+Expected: Scale up to 1.05 with glow intensifies
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Test button active state**
+
+Click and hold button
+Expected: Scale down to 0.97
+
+- [ ] **Step 5: Test reduced motion**
+
+Enable reduced motion
+Expected: No scale transform
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add frontend/css/style.css
-git commit -m "style: update primary button with improved contrast"
+git commit -m "style: update primary button with scale hover effect and text-shadow"
 ```
 
 ---
@@ -760,6 +853,14 @@ git commit -m "feat: create glass-ui.js module"
   33% { transform: translateX(-50%) translateY(30px) scale(1.1); }
   66% { transform: translateX(-50%) translateY(-20px) scale(0.95); }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .background-blob-1,
+  .background-blob-2,
+  .background-blob-3 {
+    animation: none;
+  }
+}
 ```
 
 - [ ] **Step 2: Test blob animations**
@@ -912,11 +1013,17 @@ Add to `frontend/css/components.css`:
 .toast-info {
   border-left: 4px solid var(--primary);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    transition: opacity 0.01ms ease, transform 0.01ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
 ```
 
 - [ ] **Step 3: Test toast notifications**
 
-In browser console, run: `features.showToast('Test message', 'success')`
+In browser console, run: `window.features.showToast('Test message', 'success')`
 Expected: Toast appears, slides in from bottom
 
 - [ ] **Step 4: Test toast types**
@@ -964,7 +1071,7 @@ export async function copyToClipboard(text, label = 'Content') {
 
 - [ ] **Step 2: Test copy function**
 
-In console: `features.copyToClipboard('Test message', 'Message')`
+In console: `window.features.copyToClipboard('Test message', 'Message')`
 Expected: Success toast appears
 
 - [ ] **Step 3: Verify clipboard content**
@@ -1037,9 +1144,20 @@ git commit -m "feat: add copy to clipboard function"
   transform: scale(1.1);
 }
 
+.msg-action-btn:active {
+  transform: scale(0.95);
+}
+
 .msg-action-btn svg {
   width: 14px;
   height: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-action-btn:hover,
+  .msg-action-btn:active {
+    transform: none;
+  }
 }
 ```
 
@@ -1051,7 +1169,7 @@ Expected: Action buttons appear above bubble
 - [ ] **Step 3: Test button clicks**
 
 Click an action button
-Expected: Visual feedback, scale on hover
+Expected: Visual feedback, scale on hover/active
 
 - [ ] **Step 4: Commit**
 
@@ -1215,7 +1333,7 @@ git commit -m "feat: create keyboard shortcuts module"
 
 - [ ] **Step 1: Add keyboard.js to import**
 
-Update the script block:
+Update script block:
 
 ```html
 <script type="module">
@@ -1278,9 +1396,6 @@ git commit -m "feat: integrate keyboard module"
     z-index: 50;
     transform: translateX(-100%);
     transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur-heavy));
-    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
   }
 
   .sidebar.open {
@@ -1581,7 +1696,7 @@ Expected: All elements found, no null reference errors
 
 ```bash
 git add frontend/js/app.js
-git commit -m "refactor: update app elements reference"
+git commit -m "refactor: update app elements reference with mobile elements"
 ```
 
 ---
@@ -1725,6 +1840,13 @@ Find and replace .icon-btn:hover styles:
 .icon-btn:active:not(:disabled) {
   transform: scale(0.97);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn:hover:not(:disabled),
+  .icon-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
 ```
 
 - [ ] **Step 2: Test button hover**
@@ -1764,7 +1886,7 @@ Expected: All features work (blur effects require FF 103+)
 - [ ] **Step 3: Test in Safari (14+)**
 
 Open app in Safari
-Expected: All features work, smooth animations
+Expected: All features work
 
 - [ ] **Step 4: Test in Edge (90+)**
 
@@ -1859,23 +1981,26 @@ All tasks completed. The Glass & Futuristic Luban UI transformation is ready for
 
 ### Summary of Changes
 
-- CSS variables updated with glass system
-- Glass panel effects applied to all major components
+- CSS variables updated with glass system including bubble colors
+- Glass panel effects applied to all major components (sidebar, session cards, messages, top bar, composer)
+- Hover/active animations implemented for all interactive elements
 - Animated gradient background with 3 floating blobs
 - Toast notification system implemented
-- Keyboard shortcuts added
-- Mobile responsive design with sidebar drawer
+- Keyboard shortcuts module created (Ctrl+K, Ctrl+N, Ctrl+/, Escape)
+- Mobile responsive design with sidebar drawer and hamburger menu
 - Accessibility improvements (focus, reduced motion, high contrast)
 - Cross-browser compatibility with fallbacks
+- Message entry animation and typing indicator
 
 ### Final Verification
 
 - [ ] Visual impact: Glass effects are visible and modern
-- [ ] Readability: All text meets WCAG AA contrast
+- [ ] Readability: All text meets WCAG AA contrast (4.5:1)
 - [ ] Performance: Animations run at 60fps
-- [ ] Accessibility: Keyboard navigation, screen reader support
+- [ ] Accessibility: Keyboard navigation, screen reader support, reduced motion, high contrast
 - [ ] Responsive: Mobile, tablet, desktop layouts work
 - [ ] Browser support: Works in Chrome, Firefox, Safari, Edge
+- [ ] Code quality: Files are focused, responsibilities clear, no duplication
 
 ---
 
