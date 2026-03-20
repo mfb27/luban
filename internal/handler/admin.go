@@ -276,6 +276,51 @@ func (a *AdminApp) adminDeleteUser(c *gin.Context) {
 	response.NewResponseHelper(c).Success(gin.H{"message": "user deleted successfully"})
 }
 
+// adminBatchUpdateUserStatus 批量更新用户状态
+func (a *AdminApp) adminBatchUpdateUserStatus(c *gin.Context) {
+	var req model.BatchUserStatusRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, err.Error())
+		return
+	}
+
+	// 去重用户ID
+	uniqueUserIDs := make(map[string]bool)
+	for _, id := range req.UserIDs {
+		uniqueUserIDs[id] = true
+	}
+	req.UserIDs = make([]string, 0, len(uniqueUserIDs))
+	for id := range uniqueUserIDs {
+		req.UserIDs = append(req.UserIDs, id)
+	}
+
+	// 验证所有用户存在
+	var count int64
+	if err := a.db.Model(&model.User{}).Where("id IN ?", req.UserIDs).Count(&count).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to verify users")
+		return
+	}
+	if int(count) != len(req.UserIDs) {
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "one or more users not found")
+		return
+	}
+
+	// 批量更新
+	result := a.db.Model(&model.User{}).
+		Where("id IN ?", req.UserIDs).
+		Update("status", req.Status)
+
+	if result.Error != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to update user status")
+		return
+	}
+
+	response.NewResponseHelper(c).Success(gin.H{
+		"updated_count": result.RowsAffected,
+	})
+}
+
 // adminGetModels 获取模型列表
 func (a *AdminApp) adminGetModels(c *gin.Context) {
 	// NEW VERSION - This should be executed now
