@@ -8,9 +8,10 @@ Add batch management functionality to the user management module in the Luban ad
 
 - Support batch operations on multiple users simultaneously
 - Maximum of 50 users per batch operation
-- All-or-nothing transaction approach (rollback if any operation fails)
+- Validate all user IDs exist before performing operations
 - Confirmation dialog before executing batch operations
 - Clear UI feedback for selection state and operation results
+- Loading state during batch operations to prevent duplicate requests
 
 ## Backend Implementation
 
@@ -59,7 +60,7 @@ type BatchDeleteRequest struct {
 
 **Error Responses:**
 - `10000001` - Invalid parameters (empty user_ids, invalid status, or >50 IDs)
-- `50000002` - User not found
+- `10000004` - User not found (one or more user IDs don't exist)
 - `20000003` - Database error
 
 #### 2. Batch Delete Users
@@ -87,7 +88,7 @@ type BatchDeleteRequest struct {
 
 **Error Responses:**
 - `10000001` - Invalid parameters (empty user_ids or >50 IDs)
-- `50000002` - User not found
+- `10000004` - User not found (one or more user IDs don't exist)
 - `20000003` - Database error
 
 ### Handler Implementation
@@ -104,28 +105,34 @@ func (a *AdminApp) adminBatchUpdateUserStatus(c *gin.Context) {
         return
     }
 
-    // 使用事务确保全部成功或全部回滚
-    tx := a.db.Begin()
-    defer func() {
-        if r := recover(); r != nil {
-            tx.Rollback()
-        }
-    }()
+    // 去重用户ID
+    uniqueUserIDs := make(map[string]bool)
+    for _, id := range req.UserIDs {
+        uniqueUserIDs[id] = true
+    }
+    req.UserIDs = make([]string, 0, len(uniqueUserIDs))
+    for id := range uniqueUserIDs {
+        req.UserIDs = append(req.UserIDs, id)
+    }
+
+    // 验证所有用户存在
+    var count int64
+    if err := a.db.Model(&model.User{}).Where("id IN ?", req.UserIDs).Count(&count).Error; err != nil {
+        response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to verify users")
+        return
+    }
+    if int(count) != len(req.UserIDs) {
+        response.NewResponseHelper(c).Error(response.CodeNotFound, "one or more users not found")
+        return
+    }
 
     // 批量更新
-    result := tx.Model(&model.User{}).
+    result := a.db.Model(&model.User{}).
         Where("id IN ?", req.UserIDs).
         Update("status", req.Status)
 
     if result.Error != nil {
-        tx.Rollback()
         response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to update user status")
-        return
-    }
-
-    // 提交事务
-    if err := tx.Commit().Error; err != nil {
-        response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to commit transaction")
         return
     }
 
@@ -143,26 +150,32 @@ func (a *AdminApp) adminBatchDeleteUsers(c *gin.Context) {
         return
     }
 
-    // 使用事务确保全部成功或全部回滚
-    tx := a.db.Begin()
-    defer func() {
-        if r := recover(); r != nil {
-            tx.Rollback()
-        }
-    }()
+    // 去重用户ID
+    uniqueUserIDs := make(map[string]bool)
+    for _, id := range req.UserIDs {
+        uniqueUserIDs[id] = true
+    }
+    req.UserIDs = make([]string, 0, len(uniqueUserIDs))
+    for id := range uniqueUserIDs {
+        req.UserIDs = append(req.UserIDs, id)
+    }
 
-    // 批量删除
-    result := tx.Where("id IN ?", req.UserIDs).Delete(&model.User{})
-
-    if result.Error != nil {
-        tx.Rollback()
-        response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to delete users")
+    // 验证所有用户存在
+    var count int64
+    if err := a.db.Model(&model.User{}).Where("id IN ?", req.UserIDs).Count(&count).Error; err != nil {
+        response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to verify users")
+        return
+    }
+    if int(count) != len(req.UserIDs) {
+        response.NewResponseHelper(c).Error(response.CodeNotFound, "one or more users not found")
         return
     }
 
-    // 提交事务
-    if err := tx.Commit().Error; err != nil {
-        response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to commit transaction")
+    // 批量删除（物理删除，与现有 adminDeleteUser 保持一致）
+    result := a.db.Where("id IN ?", req.UserIDs).Delete(&model.User{})
+
+    if result.Error != nil {
+        response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to delete users")
         return
     }
 
@@ -372,6 +385,7 @@ const state = {
 // 更新选择状态
 function updateSelectionState() {
     const checkboxes = document.querySelectorAll('.user-checkbox:checked');
+    // 自动去重（Set会自动去重）
     state.selectedUserIds = new Set(Array.from(checkboxes).map(cb => cb.value));
 
     const toolbar = document.getElementById('selectionToolbar');
@@ -423,6 +437,13 @@ async function batchUpdateStatus(status) {
         return;
     }
 
+    // 禁用按钮防止重复点击
+    const buttons = document.querySelectorAll('.selection-actions .btn');
+    buttons.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('btn-loading');
+    });
+
     try {
         const result = await api('/api/admin/users/batch/status', {
             method: 'PUT',
@@ -437,6 +458,12 @@ async function batchUpdateStatus(status) {
         loadUsers();
     } catch (error) {
         showAlert('user', 'error', error.message);
+    } finally {
+        // 恢复按钮状态
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('btn-loading');
+        });
     }
 }
 
@@ -453,6 +480,13 @@ async function batchDeleteUsers() {
         return;
     }
 
+    // 禁用按钮防止重复点击
+    const buttons = document.querySelectorAll('.selection-actions .btn');
+    buttons.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('btn-loading');
+    });
+
     try {
         const result = await api('/api/admin/users/batch', {
             method: 'DELETE',
@@ -466,6 +500,12 @@ async function batchDeleteUsers() {
         loadUsers();
     } catch (error) {
         showAlert('user', 'error', error.message);
+    } finally {
+        // 恢复按钮状态
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('btn-loading');
+        });
     }
 }
 ```
