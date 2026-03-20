@@ -572,7 +572,71 @@ Authorization: Bearer {admin_token}
 }
 ```
 
-### 18. 获取模型列表（管理员）
+### 23. 批量更新用户状态
+
+**PUT** `/api/admin/users/batch/status`
+
+**请求头：**
+```
+Authorization: Bearer {admin_token}
+```
+
+**请求体：**
+```json
+{
+  "user_ids": ["uuid1", "uuid2", ...],
+  "status": "active"
+}
+```
+
+**参数限制：**
+- `user_ids`: 1-50个用户ID数组
+- `status`: "active" 或 "inactive"
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "updated_count": 5
+  },
+  "requestId": "uuid"
+}
+```
+
+### 24. 批量删除用户
+
+**DELETE** `/api/admin/users/batch`
+
+**请求头：**
+```
+Authorization: Bearer {admin_token}
+```
+
+**请求体：**
+```json
+{
+  "user_ids": ["uuid1", "uuid2", ...]
+}
+```
+
+**参数限制：**
+- `user_ids`: 1-50个用户ID数组
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "deleted_count": 5
+  },
+  "requestId": "uuid"
+}
+```
+
+### 25. 获取模型列表（管理员）
 
 **GET** `/api/admin/models`
 
