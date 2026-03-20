@@ -640,6 +640,92 @@ async function toggleUserStatus(userId, currentStatus) {
     }
 }
 
+// 批量更新用户状态
+async function batchUpdateStatus(status) {
+    const userIds = Array.from(state.selectedUserIds);
+    const action = status === 'active' ? '激活' : '禁用';
+
+    if (userIds.length === 0) {
+        showAlert('user', 'error', '请先选择用户');
+        return;
+    }
+
+    if (!confirm(`确定要${action}选中的 ${userIds.length} 个用户吗？`)) {
+        return;
+    }
+
+    // 禁用按钮防止重复点击
+    const buttons = document.querySelectorAll('.selection-actions .btn');
+    buttons.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('btn-loading');
+    });
+
+    try {
+        const result = await api('/api/admin/users/batch/status', {
+            method: 'PUT',
+            body: JSON.stringify({
+                user_ids: userIds,
+                status: status
+            })
+        });
+
+        showAlert('user', 'success', `成功${action} ${result.updated_count} 个用户`);
+        clearSelection();
+        loadUsers();
+    } catch (error) {
+        showAlert('user', 'error', error.message);
+    } finally {
+        // 恢复按钮状态
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('btn-loading');
+        });
+    }
+}
+
+// 批量删除用户
+async function batchDeleteUsers() {
+    const userIds = Array.from(state.selectedUserIds);
+
+    if (userIds.length === 0) {
+        showAlert('user', 'error', '请先选择用户');
+        return;
+    }
+
+    if (!confirm(`确定要删除选中的 ${userIds.length} 个用户吗？此操作不可恢复！`)) {
+        return;
+    }
+
+    // 禁用按钮防止重复点击
+    const buttons = document.querySelectorAll('.selection-actions .btn');
+    buttons.forEach(btn => {
+        btn.disabled = true;
+        btn.classList.add('btn-loading');
+    });
+
+    try {
+        const result = await api('/api/admin/users/batch', {
+            method: 'DELETE',
+            body: JSON.stringify({
+                user_ids: userIds
+            })
+        });
+
+        showAlert('user', 'success', `成功删除 ${result.deleted_count} 个用户`);
+        clearSelection();
+        loadUsers();
+    } catch (error) {
+        showAlert('user', 'error', error.message);
+    } finally {
+        // 恢复按钮状态
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('btn-loading');
+        });
+    }
+}
+
 // 删除用户
 async function deleteUser(userId) {
     if (!confirm('确定要删除该用户吗？此操作不可恢复！')) {
@@ -682,6 +768,47 @@ function showModelModal(modelId = null) {
     }
 
     modal.classList.add('active');
+}
+
+// 更新选择状态
+function updateSelectionState() {
+    const checkboxes = document.querySelectorAll('.user-checkbox:checked');
+    // 自动去重（Set会自动去重）
+    state.selectedUserIds = new Set(Array.from(checkboxes).map(cb => cb.value));
+
+    const toolbar = document.getElementById('selectionToolbar');
+    const countSpan = document.getElementById('selectedCount');
+
+    if (state.selectedUserIds.size > 0) {
+        toolbar.style.display = 'flex';
+        countSpan.textContent = `已选择 ${state.selectedUserIds.size} 个用户`;
+    } else {
+        toolbar.style.display = 'none';
+    }
+
+    // 更新"全选"复选框状态
+    const selectAll = document.getElementById('selectAllUsers');
+    const allCheckboxes = document.querySelectorAll('.user-checkbox');
+    if (allCheckboxes.length > 0) {
+        selectAll.checked = Array.from(allCheckboxes).every(cb => cb.checked);
+        selectAll.indeterminate = Array.from(allCheckboxes).some(cb => cb.checked) &&
+                                !Array.from(allCheckboxes).every(cb => cb.checked);
+    }
+}
+
+// 全选/取消全选
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAllUsers');
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateSelectionState();
+}
+
+// 清除选择
+function clearSelection() {
+    document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllUsers').checked = false;
+    updateSelectionState();
 }
 
 // 关闭模型模态框
