@@ -69,3 +69,14 @@ type UpdateAdminModelRequest struct {
 	Status      string `json:"status" binding:"oneof=active inactive"`
 	Description string `json:"description"`
 }
+
+// BatchUserStatusRequest 批量更新用户状态请求
+type BatchUserStatusRequest struct {
+	UserIDs []string `json:"user_ids" binding:"required,min=1,max=50"`
+	Status  string   `json:"status" binding:"required,oneof=active inactive"`
+}
+
+// BatchDeleteRequest 批量删除用户请求
+type BatchDeleteRequest struct {
+	UserIDs []string `json:"user_ids" binding:"required,min=1,max=50"`
+}
