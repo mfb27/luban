@@ -878,6 +878,62 @@
         tr.selected {
             background: var(--primary-light);
         }
+
+        /* Selection Toolbar */
+        .selection-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--primary);
+            color: white;
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-4);
+            box-shadow: var(--shadow-md);
+            animation: slideDown var(--transition-base);
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .selection-info {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-weight: 500;
+        }
+
+        .selection-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        .selection-actions .btn {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .selection-actions .btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .selection-actions .btn-danger {
+            background: rgba(220, 38, 38, 0.8);
+            border-color: rgba(220, 38, 38, 1);
+        }
+
+        .selection-actions .btn-danger:hover {
+            background: rgba(220, 38, 38, 1);
+        }
     </style>
 </head>
 <body>
@@ -1056,6 +1112,43 @@
                 </div>
 
                 <div id="userAlertContainer"></div>
+
+                <div id="selectionToolbar" class="selection-toolbar" style="display: none;">
+                    <div class="selection-info">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                            <path d="M9 11l3 3L22 4"/>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        </svg>
+                        <span id="selectedCount">已选择 0 个用户</span>
+                    </div>
+                    <div class="selection-actions">
+                        <button class="btn btn-success" onclick="batchUpdateStatus('active')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            激活
+                        </button>
+                        <button class="btn btn-warning" onclick="batchUpdateStatus('inactive')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                            </svg>
+                            禁用
+                        </button>
+                        <button class="btn btn-danger" onclick="batchDeleteUsers()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            删除
+                        </button>
+                        <button class="btn btn-ghost" onclick="clearSelection()">
+                            取消选择
+                        </button>
+                    </div>
+                </div>
 
                 <div class="card">
                     <div class="card-body" style="padding: 0;">
