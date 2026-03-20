@@ -147,7 +147,7 @@ async function handleBatchOperation(operation) {
 
         if (operation === 'delete') {
             // 批量删除
-            await api('/api/admin/models/batch-delete', {
+            await api('/api/admin/models/batch/delete', {
                 method: 'POST',
                 body: JSON.stringify({ model_ids: modelIds })
             });
@@ -155,12 +155,10 @@ async function handleBatchOperation(operation) {
         } else if (operation === 'activate' || operation === 'deactivate') {
             // 批量激活/禁用
             const newStatus = operation === 'activate' ? 'active' : 'inactive';
-            await api('/api/admin/models/batch-update-status', {
+            const endpoint = operation === 'activate' ? 'activate' : 'deactivate';
+            await api(`/api/admin/models/batch/${endpoint}`, {
                 method: 'POST',
-                body: JSON.stringify({
-                    model_ids: modelIds,
-                    status: newStatus
-                })
+                body: JSON.stringify({ model_ids: modelIds })
             });
             const actionName = operation === 'activate' ? '激活' : '禁用';
             showAlert('model', 'success', `成功${actionName} ${selectedCount} 个模型`);

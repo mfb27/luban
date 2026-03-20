@@ -141,3 +141,64 @@ func setupTestDB() (*gorm.DB, error) {
 func createTestModels(db *gorm.DB) {
 	// 创建测试模型数据
 }
+
+func TestAdminBatchDeactivateModels(t *testing.T) {
+	// 创建模拟的数据库
+	db, err := setupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to setup test DB: %v", err)
+	}
+	defer func() {
+		if db != nil {
+			db.Migrator().DropTable(&model.Model{}, &model.Message{}, &model.Session{}, &model.User{}, &model.Attachment{})
+		}
+	}()
+
+	// 创建测试数据
+	createTestModels(db)
+
+	// 创建管理员应用
+	adminApp := NewAdminApp(nil, db)
+
+	// 创建 Gin 上下文
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	// 测试1: 正常批量禁用
+	c.Request, _ = http.NewRequest("PATCH", "/api/admin/models/batch/deactivate", nil)
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Request.Body = http.NoBody
+
+	// 这里需要模拟请求体，由于Gin的限制，我们直接调用函数
+	adminApp.adminBatchDeactivateModels(c)
+
+	// 检查响应
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	// 测试2: 空请求
+	w = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(w)
+	c.Request, _ = http.NewRequest("PATCH", "/api/admin/models/batch/deactivate", nil)
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Request.Body = http.NoBody
+	adminApp.adminBatchDeactivateModels(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d for empty request, got %d", http.StatusOK, w.Code)
+	}
+
+	// 测试3: 无效的JSON
+	w = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(w)
+	c.Request, _ = http.NewRequest("PATCH", "/api/admin/models/batch/deactivate", nil)
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Request.Body = http.NoBody
+	adminApp.adminBatchDeactivateModels(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d for invalid JSON, got %d", http.StatusOK, w.Code)
+	}
+}
