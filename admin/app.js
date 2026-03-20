@@ -3,6 +3,7 @@ const state = {
     token: localStorage.getItem('admin_token'),
     users: [],
     models: [],
+    selectedUserIds: new Set(),
     currentTab: 'dashboard',
     theme: localStorage.getItem('admin_theme') || 'light'
 };
@@ -336,8 +337,17 @@ function renderUsers(users) {
         const statusLabel = user.status === 'active' ? '禁用' : '启用';
         const statusBtnClass = user.status === 'active' ? 'danger' : 'success';
 
+        const isSelected = state.selectedUserIds.has(user.id);
+        const rowClass = isSelected ? 'selected' : '';
+
         return `
-        <tr>
+        <tr class="${rowClass}" data-user-id="${user.id}">
+            <td>
+                <input type="checkbox" class="user-checkbox"
+                       value="${user.id}"
+                       ${isSelected ? 'checked' : ''}
+                       onchange="updateSelectionState()">
+            </td>
             <td>${user.id || 'N/A'}</td>
             <td>${user.name || 'N/A'}</td>
             <td>${user.email || 'N/A'}</td>

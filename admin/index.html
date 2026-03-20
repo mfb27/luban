@@ -866,6 +866,18 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--text-secondary);
         }
+
+        /* Table Checkboxes */
+        .user-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        tr.selected {
+            background: var(--primary-light);
+        }
     </style>
 </head>
 <body>
@@ -1051,6 +1063,9 @@
                             <table class="table" id="userTable">
                                 <thead>
                                     <tr>
+                                        <th style="width: 40px;">
+                                            <input type="checkbox" id="selectAllUsers" onclick="toggleSelectAll()">
+                                        </th>
                                         <th>ID</th>
                                         <th>用户名</th>
                                         <th>邮箱</th>
