@@ -704,6 +704,53 @@
             margin-top: var(--space-1);
         }
 
+        /* Checkbox Styles */
+        .form-checkbox {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+            cursor: pointer;
+            margin-top: 2px;
+        }
+
+        .form-checkbox.model-checkbox {
+            margin-right: var(--space-2);
+        }
+
+        /* Floating Action Bar */
+        .floating-action-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-3) var(--space-4);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            z-index: 100;
+            transition: all var(--transition-base);
+        }
+
+        .action-bar-content {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+        }
+
+        .selected-count {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: var(--space-2);
+        }
+
         .modal-footer {
             display: flex;
             justify-content: flex-end;
@@ -866,97 +913,62 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--text-secondary);
         }
-
-        /* Table Checkboxes */
-        .user-checkbox {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-            accent-color: var(--primary);
-        }
-
-        tr.selected {
-            background: var(--primary-light);
-        }
-
-        /* Selection Toolbar */
-        .selection-toolbar {
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
             display: flex;
+            justify-content: center;
             align-items: center;
-            justify-content: space-between;
-            background: var(--primary);
-            color: white;
-            padding: var(--space-3) var(--space-4);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--space-4);
-            box-shadow: var(--shadow-md);
-            animation: slideDown var(--transition-base);
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-base);
         }
 
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
         }
 
-        .selection-info {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            font-weight: 500;
+        .loading-content {
+            background: var(--bg-elevated);
+            padding: var(--space-4);
+            border-radius: var(--radius-lg);
+            text-align: center;
+            box-shadow: var(--shadow-xl);
         }
 
-        .selection-actions {
-            display: flex;
-            gap: var(--space-2);
-        }
-
-        .selection-actions .btn {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            border-color: rgba(255, 255, 255, 0.3);
-        }
-
-        .selection-actions .btn:hover {
-            background: rgba(255, 255, 255, 0.25);
-        }
-
-        .selection-actions .btn-danger {
-            background: rgba(220, 38, 38, 0.8);
-            border-color: rgba(220, 38, 38, 1);
-        }
-
-        .selection-actions .btn-danger:hover {
-            background: rgba(220, 38, 38, 1);
-        }
-
-        /* Loading state for buttons */
-        .btn-loading {
-            position: relative;
-            color: transparent;
-        }
-
-        .btn-loading::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top-color: white;
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--primary);
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            animation: spin 1s linear infinite;
+            margin: 0 auto var(--space-2);
         }
 
         @keyframes spin {
-            to { transform: translate(-50%, -50%) rotate(360deg); }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Checkbox styling */
+        .model-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            margin: 0;
         }
     </style>
 </head>
@@ -1137,52 +1149,12 @@
 
                 <div id="userAlertContainer"></div>
 
-                <div id="selectionToolbar" class="selection-toolbar" style="display: none;">
-                    <div class="selection-info">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                            <path d="M9 11l3 3L22 4"/>
-                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                        </svg>
-                        <span id="selectedCount">已选择 0 个用户</span>
-                    </div>
-                    <div class="selection-actions">
-                        <button class="btn btn-success" onclick="batchUpdateStatus('active')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                                <polyline points="22 4 12 14.01 9 11.01"/>
-                            </svg>
-                            激活
-                        </button>
-                        <button class="btn btn-warning" onclick="batchUpdateStatus('inactive')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                <line x1="9" y1="9" x2="15" y2="15"/>
-                                <line x1="15" y1="9" x2="9" y2="15"/>
-                            </svg>
-                            禁用
-                        </button>
-                        <button class="btn btn-danger" onclick="batchDeleteUsers()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
-                            删除
-                        </button>
-                        <button class="btn btn-ghost" onclick="clearSelection()">
-                            取消选择
-                        </button>
-                    </div>
-                </div>
-
                 <div class="card">
                     <div class="card-body" style="padding: 0;">
                         <div class="table-container">
                             <table class="table" id="userTable">
                                 <thead>
                                     <tr>
-                                        <th style="width: 40px;">
-                                            <input type="checkbox" id="selectAllUsers" onclick="toggleSelectAll()">
-                                        </th>
                                         <th>ID</th>
                                         <th>用户名</th>
                                         <th>邮箱</th>
@@ -1234,6 +1206,9 @@
                             <table class="table" id="modelTable">
                                 <thead>
                                     <tr>
+                                        <th>
+                                            <input type="checkbox" class="form-checkbox" id="selectAllModels">
+                                        </th>
                                         <th>ID</th>
                                         <th>模型名称</th>
                                         <th>模型ID</th>
@@ -1245,7 +1220,10 @@
                                 </thead>
                                 <tbody id="modelTableBody">
                                     <tr>
-                                        <td colspan="7">
+                                        <td>
+                                            <input type="checkbox" class="form-checkbox model-checkbox" data-model-id="">
+                                        </td>
+                                        <td colspan="6">
                                             <div class="empty-state">
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -1258,6 +1236,43 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 浮动操作栏 -->
+                <div id="floatingActionBar" class="floating-action-bar" style="display: none;">
+                    <div class="action-bar-content">
+                        <span class="selected-count">已选择 <span id="selectedCount">0</span> 个模型</span>
+                        <div class="action-buttons">
+                            <button class="btn btn-danger" id="batchDeleteBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <polyline points="3 6 5 6 21 6"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                                删除
+                            </button>
+                            <button class="btn btn-success" id="batchActivateBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                    <line x1="9" y1="9" x2="15" y2="15"/>
+                                    <line x1="15" y1="9" x2="9" y2="15"/>
+                                </svg>
+                                激活
+                            </button>
+                            <button class="btn btn-warning" id="batchDeactivateBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                    <polyline points="22 4 12 14.01 9 11.01"/>
+                                </svg>
+                                禁用
+                            </button>
+                            <button class="btn btn-secondary" id="clearSelectionBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                                清除
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1353,5 +1368,13 @@
     </div>
 
     <script src="app.js"></script>
+
+    <!-- 加载遮罩 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="loading-text">处理中...</div>
+        </div>
+    </div>
 </body>
 </html>

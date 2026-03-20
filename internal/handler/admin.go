@@ -553,6 +553,221 @@ func (a *AdminApp) adminDeleteModel(c *gin.Context) {
 	response.NewResponseHelper(c).Success(gin.H{"message": "model deleted successfully"})
 }
 
+// adminBatchDeleteModels 批量删除模型
+func (a *AdminApp) adminBatchDeleteModels(c *gin.Context) {
+	var req struct {
+		ModelIDs []string `json:"model_ids" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
+		return
+	}
+
+	if len(req.ModelIDs) == 0 {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "model_ids cannot be empty")
+		return
+	}
+
+	// 开始事务
+	tx := a.db.Begin()
+	if tx.Error != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to start transaction")
+		return
+	}
+
+	var failedDeletes []string
+	var successCount int
+
+	for _, modelID := range req.ModelIDs {
+		// 检查模型是否存在
+		var modelData model.Model
+		if err := tx.First(&modelData, "id = ?", modelID).Error; err != nil {
+			failedDeletes = append(failedDeletes, modelID)
+			continue
+		}
+
+		// 检查是否有关联的消息
+		var messageCount int64
+		tx.Model(&model.Message{}).Where("model_id = ?", modelID).Count(&messageCount)
+		if messageCount > 0 {
+			failedDeletes = append(failedDeletes, modelID)
+			continue
+		}
+
+		// 删除模型
+		if err := tx.Delete(&modelData).Error; err != nil {
+			failedDeletes = append(failedDeletes, modelID)
+			continue
+		}
+
+		successCount++
+	}
+
+	// 提交事务
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to commit transaction")
+		return
+	}
+
+	if len(failedDeletes) > 0 {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":        "partial deletion completed",
+			"success_count":  successCount,
+			"failed_ids":     failedDeletes,
+			"failed_reason":  "some models could not be deleted (either not found or have associated messages)",
+		})
+	} else {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":       "all models deleted successfully",
+			"deleted_count": successCount,
+		})
+	}
+}
+
+// adminBatchActivateModels 批量激活模型
+func (a *AdminApp) adminBatchActivateModels(c *gin.Context) {
+	var req struct {
+		ModelIDs []string `json:"model_ids" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
+		return
+	}
+
+	if len(req.ModelIDs) == 0 {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "model_ids cannot be empty")
+		return
+	}
+
+	// 开始事务
+	tx := a.db.Begin()
+	if tx.Error != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to start transaction")
+		return
+	}
+
+	var failedActivations []string
+	var successCount int
+
+	for _, modelID := range req.ModelIDs {
+		// 检查模型是否存在
+		var modelData model.Model
+		if err := tx.First(&modelData, "id = ?", modelID).Error; err != nil {
+			failedActivations = append(failedActivations, modelID)
+			continue
+		}
+
+		// 检查模型是否已经是激活状态
+		if modelData.Status == "active" {
+			failedActivations = append(failedActivations, modelID)
+			continue
+		}
+
+		// 更新模型状态为active
+		if err := tx.Model(&modelData).Update("status", "active").Error; err != nil {
+			failedActivations = append(failedActivations, modelID)
+			continue
+		}
+
+		successCount++
+	}
+
+	// 提交事务
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to commit transaction")
+		return
+	}
+
+	if len(failedActivations) > 0 {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":         "partial activation completed",
+			"success_count":   successCount,
+			"failed_ids":      failedActivations,
+			"failed_reason":   "some models could not be activated (either not found or already active)",
+		})
+	} else {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":         "all models activated successfully",
+			"activated_count": successCount,
+		})
+	}
+}
+
+// adminBatchDeactivateModels 批量禁用模型
+func (a *AdminApp) adminBatchDeactivateModels(c *gin.Context) {
+	var req struct {
+		ModelIDs []string `json:"model_ids" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
+		return
+	}
+
+	if len(req.ModelIDs) == 0 {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "model_ids cannot be empty")
+		return
+	}
+
+	// 开始事务
+	tx := a.db.Begin()
+	if tx.Error != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to start transaction")
+		return
+	}
+
+	var failedDeactivations []string
+	var successCount int
+
+	for _, modelID := range req.ModelIDs {
+		// 检查模型是否存在
+		var modelData model.Model
+		if err := tx.First(&modelData, "id = ?", modelID).Error; err != nil {
+			failedDeactivations = append(failedDeactivations, modelID)
+			continue
+		}
+
+		// 检查模型是否已经是禁用状态
+		if modelData.Status == "inactive" {
+			failedDeactivations = append(failedDeactivations, modelID)
+			continue
+		}
+
+		// 更新模型状态为inactive
+		if err := tx.Model(&modelData).Update("status", "inactive").Error; err != nil {
+			failedDeactivations = append(failedDeactivations, modelID)
+			continue
+		}
+
+		successCount++
+	}
+
+	// 提交事务
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to commit transaction")
+		return
+	}
+
+	if len(failedDeactivations) > 0 {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":           "partial deactivation completed",
+			"success_count":     successCount,
+			"failed_ids":        failedDeactivations,
+			"failed_reason":     "some models could not be deactivated (either not found or already inactive)",
+		})
+	} else {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":           "all models deactivated successfully",
+			"deactivated_count": successCount,
+		})
+	}
+}
+
 // registerAdminRoutes 注册管理员路由
 func (a *App) registerAdminRoutes() {
 	// 创建管理员应用
@@ -584,6 +799,11 @@ func (a *App) registerAdminRoutes() {
 		adminGroup.PUT("/models/:id", adminApp.adminUpdateModel)
 		adminGroup.PATCH("/models/:id/status", adminApp.adminToggleModelStatus)
 		adminGroup.DELETE("/models/:id", adminApp.adminDeleteModel)
+
+		// 批量操作
+		adminGroup.POST("/models/batch/delete", adminApp.adminBatchDeleteModels)
+		adminGroup.POST("/models/batch/activate", adminApp.adminBatchActivateModels)
+		adminGroup.POST("/models/batch/deactivate", adminApp.adminBatchDeactivateModels)
 	}
 
 	// Serve admin index page (public)

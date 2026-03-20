@@ -5,7 +5,8 @@ const state = {
     models: [],
     selectedUserIds: new Set(),
     currentTab: 'dashboard',
-    theme: localStorage.getItem('admin_theme') || 'light'
+    theme: localStorage.getItem('admin_theme') || 'light',
+    selectedModels: new Set()
 };
 
 // API 基础 URL
@@ -24,6 +25,169 @@ function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('admin_theme', theme);
     state.theme = theme;
+}
+
+// 初始化模型表格事件
+function initModelTableEvents() {
+    const selectAllCheckbox = document.getElementById('selectAllModels');
+    const modelCheckboxes = document.querySelectorAll('.model-checkbox');
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            const isChecked = this.checked;
+            modelCheckboxes.forEach(checkbox => {
+                checkbox.checked = isChecked;
+                const modelId = checkbox.dataset.modelId;
+                if (isChecked) {
+                    state.selectedModels.add(modelId);
+                } else {
+                    state.selectedModels.delete(modelId);
+                }
+            });
+            updateFloatingActionBar();
+        });
+    }
+
+    modelCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const modelId = this.dataset.modelId;
+            if (this.checked) {
+                state.selectedModels.add(modelId);
+            } else {
+                state.selectedModels.delete(modelId);
+            }
+
+            // 更新全选框状态
+            const checkedCount = document.querySelectorAll('.model-checkbox:checked').length;
+            const totalCount = modelCheckboxes.length;
+            selectAllCheckbox.checked = totalCount > 0 && checkedCount === totalCount;
+            selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < totalCount;
+
+            updateFloatingActionBar();
+        });
+    });
+
+    // 绑定浮动操作栏按钮事件
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    const batchActivateBtn = document.getElementById('batchActivateBtn');
+    const batchDeactivateBtn = document.getElementById('batchDeactivateBtn');
+    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+
+    if (batchDeleteBtn) {
+        batchDeleteBtn.addEventListener('click', () => handleBatchOperation('delete'));
+    }
+
+    if (batchActivateBtn) {
+        batchActivateBtn.addEventListener('click', () => handleBatchOperation('activate'));
+    }
+
+    if (batchDeactivateBtn) {
+        batchDeactivateBtn.addEventListener('click', () => handleBatchOperation('deactivate'));
+    }
+
+    if (clearSelectionBtn) {
+        clearSelectionBtn.addEventListener('click', clearSelection);
+    }
+}
+
+// 更新浮动操作栏
+function updateFloatingActionBar() {
+    const floatingActionBar = document.getElementById('floatingActionBar');
+    const selectedCount = state.selectedModels.size;
+
+    if (selectedCount > 0) {
+        floatingActionBar.style.display = 'flex';
+        floatingActionBar.querySelector('.selected-count').textContent =
+            `已选择 ${selectedCount} 个模型`;
+    } else {
+        floatingActionBar.style.display = 'none';
+    }
+}
+
+// 清除选择
+function clearSelection() {
+    const selectAllCheckbox = document.getElementById('selectAllModels');
+    const modelCheckboxes = document.querySelectorAll('.model-checkbox');
+
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+
+    modelCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+
+    state.selectedModels.clear();
+    updateFloatingActionBar();
+}
+
+// 处理批量操作
+async function handleBatchOperation(operation) {
+    const selectedCount = state.selectedModels.size;
+
+    if (selectedCount === 0) {
+        showAlert('model', 'error', '请先选择要操作的模型');
+        return;
+    }
+
+    const operationNames = {
+        delete: '删除',
+        activate: '激活',
+        deactivate: '禁用'
+    };
+
+    const operationName = operationNames[operation];
+
+    if (!confirm(`确定要${operationName}选中的 ${selectedCount} 个模型吗？`)) {
+        return;
+    }
+
+    showLoadingOverlay();
+
+    try {
+        const modelIds = Array.from(state.selectedModels);
+
+        if (operation === 'delete') {
+            // 批量删除
+            await api('/api/admin/models/batch/delete', {
+                method: 'POST',
+                body: JSON.stringify({ model_ids: modelIds })
+            });
+            showAlert('model', 'success', `成功删除 ${selectedCount} 个模型`);
+        } else if (operation === 'activate' || operation === 'deactivate') {
+            // 批量激活/禁用
+            const newStatus = operation === 'activate' ? 'active' : 'inactive';
+            const endpoint = operation === 'activate' ? 'activate' : 'deactivate';
+            await api(`/api/admin/models/batch/${endpoint}`, {
+                method: 'POST',
+                body: JSON.stringify({ model_ids: modelIds })
+            });
+            const actionName = operation === 'activate' ? '激活' : '禁用';
+            showAlert('model', 'success', `成功${actionName} ${selectedCount} 个模型`);
+        }
+
+        clearSelection();
+        loadModels();
+    } catch (error) {
+        showAlert('model', 'error', `批量${operationNames[operation]}失败: ${error.message}`);
+    } finally {
+        hideLoadingOverlay();
+    }
+}
+
+// 显示加载遮罩
+function showLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.classList.add('active');
+    }
+}
+
+// 隐藏加载遮罩
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+    }
 }
 
 // 初始化主题
@@ -93,6 +257,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (userAvatar) userAvatar.textContent = (me.name || 'A')[0].toUpperCase();
         if (userName) userName.textContent = me.name || '管理员';
         console.log('管理员信息:', me);
+
+        // 初始化模型表格事件
+        initModelTableEvents();
 
         // 加载初始数据
         await loadDashboard();
@@ -483,6 +650,9 @@ function renderModels(models) {
 
             return `
             <tr>
+                <td>
+                    <input type="checkbox" class="model-checkbox" data-model-id="${id}" title="选择此模型">
+                </td>
                 <td>${id}</td>
                 <td>${name}</td>
                 <td>${modelId}</td>
@@ -526,7 +696,7 @@ function renderModels(models) {
         // 显示错误状态
         tbody.innerHTML = `
             <tr>
-                <td colspan="7">
+                <td colspan="8">
                     <div class="empty-state">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                             <circle cx="12" cy="12" r="10"/>

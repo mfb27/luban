@@ -28,10 +28,8 @@
       "Bash(taskkill:*)",
       "Bash(netstat -ano)",
       "Bash(findstr :8080)",
-      "Bash(git worktree:*)",
       "Bash(go test:*)",
-      "Bash(pkill:*)",
-      "Bash(git push:*)"
+      "Bash(start:*)"
     ]
   }
 }
