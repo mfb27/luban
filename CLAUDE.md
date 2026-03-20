@@ -123,3 +123,11 @@ The application auto-migrates these tables on startup:
 2. **Graceful Shutdown**: Uses context with timeout for clean shutdown.
 3. **Structured Logging**: Uses Zap logger with structured fields.
 4. **Configuration Binding**: Uses Viper for config with mapstructure binding.
+5. **API Response Structure**: All API responses must use the `APIResponse` struct for consistency. Example:
+```go
+type APIResponse struct {
+    Code    int         `json:"code"`
+    Message string      `json:"message"`
+    Data    interface{} `json:"data"`
+}
+```

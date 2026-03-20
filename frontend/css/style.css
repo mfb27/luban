@@ -8,6 +8,11 @@
   --primary: #6366f1;
   --primary-glow: rgba(99, 102, 241, 0.4);
   --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.08);
+  --danger-border: rgba(239, 68, 68, 0.25);
+  --warning: #f59e0b;
+  --warning-dark: #d97706;
+  --warning-bg: rgba(245, 158, 11, 0.08);
   --success: #22c55e;
   --bg-sidebar: rgba(255, 255, 255, 0.15);
 
@@ -32,6 +37,18 @@
   --focus-offset: 2px;
 }
 
+/* Animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 html[data-theme="dark"] {
   /* Colors - Dark Mode */
   --bg-primary: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #172554 100%);
@@ -42,6 +59,11 @@ html[data-theme="dark"] {
   --primary: #818cf8;
   --primary-glow: rgba(129, 140, 248, 0.5);
   --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.08);
+  --danger-border: rgba(248, 113, 113, 0.25);
+  --warning: #fbbf24;
+  --warning-dark: #f59e0b;
+  --warning-bg: rgba(251, 191, 36, 0.08);
   --success: #4ade80;
   --bg-sidebar: rgba(30, 41, 59, 0.3);
 
@@ -983,12 +1005,62 @@ html[data-theme="dark"] .send-btn:disabled {
 
 .error-bar {
   margin-top: 10px;
-  padding: 10px 12px;
+  padding: 12px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(185, 28, 28, 0.25);
-  background: rgba(185, 28, 28, 0.08);
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
   color: var(--danger);
-  font-size: 12px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideDown var(--transition-base);
+  transition: all var(--transition-fast);
+}
+
+.error-bar::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  background: currentColor;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cline x1='12' y1='8' x2='12' y2='12'%3E%3C/line%3E%3Cline x1='12' y1='16' x2='12.01' y2='16'%3E%3C/line%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.error-bar.error-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  left: 20px;
+  margin-top: 0;
+  z-index: 1000;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--danger);
+}
+
+@media (min-width: 640px) {
+  .error-bar.error-toast {
+    max-width: 400px;
+    right: auto;
+    left: auto;
+  }
+}
+
+.error-bar.error-network {
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--warning, #f59e0b);
+}
+
+.error-bar.error-auth {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--primary);
+}
+
+.error-bar.error-validation {
+  background: rgba(251, 191, 36, 0.08);
+  color: var(--warning-dark, #d97706);
 }
 .hidden {
   display: none;

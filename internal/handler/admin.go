@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mfb27/luban/internal/admin"
 	"github.com/mfb27/luban/internal/model"
+	"github.com/mfb27/luban/internal/response"
 	"gorm.io/gorm"
 )
 
@@ -18,7 +19,7 @@ func CreateAdminMiddleware(authService *admin.AdminAuthService) gin.HandlerFunc 
 	return func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
 		if token == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header is required"})
+			response.NewResponseHelper(c).Error(response.CodeNoToken, "authorization header is required")
 			c.Abort()
 			return
 		}
@@ -30,7 +31,7 @@ func CreateAdminMiddleware(authService *admin.AdminAuthService) gin.HandlerFunc 
 
 		claims, err := authService.ValidateToken(token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+			response.NewResponseHelper(c).Error(response.CodeTokenInvalid, "invalid token")
 			c.Abort()
 			return
 		}
@@ -64,7 +65,7 @@ func (a *AdminApp) adminLogin(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		NewResponseHelper(c).Error(CodeInvalidParam, "invalid request")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
 		return
 	}
 
@@ -72,18 +73,18 @@ func (a *AdminApp) adminLogin(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case admin.ErrAdminNotFound:
-			NewResponseHelper(c).Error(CodeNotFound, "admin not found")
+			response.NewResponseHelper(c).Error(response.CodeNotFound, "admin not found")
 		case admin.ErrInvalidPassword:
-			NewResponseHelper(c).Error(CodeInvalidParam, "invalid password")
+			response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid password")
 		case admin.ErrAdminDisabled:
-			NewResponseHelper(c).Error(CodeForbidden, "admin account is disabled")
+			response.NewResponseHelper(c).Error(response.CodeForbidden, "admin account is disabled")
 		default:
-			NewResponseHelper(c).Error(CodeInternal, "login failed")
+			response.NewResponseHelper(c).Error(response.CodeInternal, "login failed")
 		}
 		return
 	}
 
-	NewResponseHelper(c).Success(gin.H{
+	response.NewResponseHelper(c).Success(gin.H{
 		"token": token,
 		"admin": gin.H{
 			"id":    "admin", // 简化处理
@@ -97,7 +98,7 @@ func (a *AdminApp) adminGetMe(c *gin.Context) {
 	adminID := c.GetString("admin_id")
 	adminEmail := c.GetString("admin_email")
 
-	NewResponseHelper(c).Success(gin.H{
+	response.NewResponseHelper(c).Success(gin.H{
 		"id":    adminID,
 		"email": adminEmail,
 		"name":  "管理员", // 简化处理
@@ -135,7 +136,7 @@ func (a *AdminApp) adminGetUsers(c *gin.Context) {
 	query = query.Offset(offset).Limit(pageSize)
 
 	if err := query.Scan(&users).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to load users")
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to load users")
 		return
 	}
 
@@ -143,7 +144,7 @@ func (a *AdminApp) adminGetUsers(c *gin.Context) {
 	var total int64
 	a.db.Model(&model.User{}).Count(&total)
 
-	NewResponseHelper(c).Success(gin.H{
+	response.NewResponseHelper(c).Success(gin.H{
 		"users": users,
 		"total": total,
 		"page":  page,
@@ -156,14 +157,14 @@ func (a *AdminApp) adminCreateUser(c *gin.Context) {
 	var req model.CreateAdminUserRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		NewResponseHelper(c).Error(CodeInvalidParam, "invalid request")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
 		return
 	}
 
 	// 检查邮箱是否已存在
 	var existingUser model.User
 	if err := a.db.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
-		NewResponseHelper(c).Error(CodeInvalidParam, "email already exists")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "email already exists")
 		return
 	}
 
@@ -176,11 +177,11 @@ func (a *AdminApp) adminCreateUser(c *gin.Context) {
 	}
 
 	if err := a.db.Create(&user).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to create user")
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to create user")
 		return
 	}
 
-	NewResponseHelper(c).Success(user)
+	response.NewResponseHelper(c).Success(user)
 }
 
 // adminUpdateUser 更新用户
@@ -190,14 +191,14 @@ func (a *AdminApp) adminUpdateUser(c *gin.Context) {
 	var req model.UpdateAdminUserRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		NewResponseHelper(c).Error(CodeInvalidParam, "invalid request")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
 		return
 	}
 
 	// 检查用户是否存在
 	var user model.User
 	if err := a.db.First(&user, "id = ?", userID).Error; err != nil {
-		NewResponseHelper(c).Error(CodeNotFound, "user not found")
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "user not found")
 		return
 	}
 
@@ -214,18 +215,18 @@ func (a *AdminApp) adminUpdateUser(c *gin.Context) {
 	}
 
 	if len(updates) == 0 {
-		NewResponseHelper(c).Error(CodeInvalidParam, "no fields to update")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "no fields to update")
 		return
 	}
 
 	if err := a.db.Model(&user).Updates(updates).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to update user")
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to update user")
 		return
 	}
 
 	// 重新获取更新后的用户数据
 	a.db.First(&user, "id = ?", userID)
-	NewResponseHelper(c).Success(user)
+	response.NewResponseHelper(c).Success(user)
 }
 
 // adminToggleUserStatus 切换用户状态
@@ -236,23 +237,23 @@ func (a *AdminApp) adminToggleUserStatus(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		NewResponseHelper(c).Error(CodeInvalidParam, "invalid request")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
 		return
 	}
 
 	// 检查用户是否存在
 	var user model.User
 	if err := a.db.First(&user, "id = ?", userID).Error; err != nil {
-		NewResponseHelper(c).Error(CodeNotFound, "user not found")
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "user not found")
 		return
 	}
 
 	if err := a.db.Model(&user).Update("status", req.Status).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to update user status")
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to update user status")
 		return
 	}
 
-	NewResponseHelper(c).Success(gin.H{"status": req.Status})
+	response.NewResponseHelper(c).Success(gin.H{"status": req.Status})
 }
 
 // adminDeleteUser 删除用户
@@ -262,62 +263,68 @@ func (a *AdminApp) adminDeleteUser(c *gin.Context) {
 	// 检查用户是否存在
 	var user model.User
 	if err := a.db.First(&user, "id = ?", userID).Error; err != nil {
-		NewResponseHelper(c).Error(CodeNotFound, "user not found")
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "user not found")
 		return
 	}
 
 	// 删除用户（实际应该标记为删除，而不是物理删除）
 	if err := a.db.Delete(&user).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to delete user")
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to delete user")
 		return
 	}
 
-	NewResponseHelper(c).Success(gin.H{"message": "user deleted successfully"})
+	response.NewResponseHelper(c).Success(gin.H{"message": "user deleted successfully"})
 }
 
 // adminGetModels 获取模型列表
 func (a *AdminApp) adminGetModels(c *gin.Context) {
+	// NEW VERSION - This should be executed now
 	var models []model.AdminModel
 
-	// 构建查询
-	query := a.db.Model(&model.Model{}).
-		Select(`
-			id, name, model_id, status, description, created_at,
-			(SELECT COUNT(*) FROM messages WHERE model_id = models.id) as message_count
-		`)
-
-	// 搜索条件
-	if search := c.Query("search"); search != "" {
-		query = query.Where("name LIKE ? OR model_id LIKE ?", "%"+search+"%", "%"+search+"%")
-	}
-
-	// 状态过滤
-	if status := c.Query("status"); status != "" {
-		query = query.Where("status = ?", status)
-	}
-
-	// 分页
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	offset := (page - 1) * pageSize
-
-	query = query.Offset(offset).Limit(pageSize)
-
-	if err := query.Scan(&models).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to load models")
+	// 先获取基础模型数据
+	if err := a.db.Model(&model.Model{}).
+		Select("id, name, model_id, status, description, created_at").
+		Find(&models).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to load models")
 		return
+	}
+
+	// 确保即使没有数据也返回空数组而不是null
+	if models == nil {
+		models = []model.AdminModel{}
 	}
 
 	// 获取总数
 	var total int64
 	a.db.Model(&model.Model{}).Count(&total)
 
-	NewResponseHelper(c).Success(gin.H{
+	response.NewResponseHelper(c).Success(gin.H{
 		"models": models,
 		"total": total,
-		"page":  page,
-		"page_size": pageSize,
+		"page":  1,
+		"page_size": 20,
 	})
+}
+
+// getModelsData 获取模型数据的辅助函数
+func (a *AdminApp) getModelsData() ([]model.AdminModel, error) {
+	var models []model.AdminModel
+
+	// 尝试直接查询
+	err := a.db.Model(&model.Model{}).
+		Select("id, name, model_id, status, description, created_at").
+		Find(&models).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查是否为nil
+	if models == nil {
+		models = []model.AdminModel{}
+	}
+
+	return models, nil
 }
 
 // adminCreateModel 创建模型
@@ -325,14 +332,14 @@ func (a *AdminApp) adminCreateModel(c *gin.Context) {
 	var req model.CreateAdminModelRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		NewResponseHelper(c).Error(CodeInvalidParam, "invalid request")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
 		return
 	}
 
 	// 检查模型ID是否已存在
 	var existingModel model.Model
 	if err := a.db.Where("model_id = ?", req.ModelID).First(&existingModel).Error; err == nil {
-		NewResponseHelper(c).Error(CodeInvalidParam, "model_id already exists")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "model_id already exists")
 		return
 	}
 
@@ -349,11 +356,11 @@ func (a *AdminApp) adminCreateModel(c *gin.Context) {
 	}
 
 	if err := a.db.Create(&modelData).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to create model")
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to create model")
 		return
 	}
 
-	NewResponseHelper(c).Success(modelData)
+	response.NewResponseHelper(c).Success(modelData)
 }
 
 // adminUpdateModel 更新模型
@@ -363,14 +370,14 @@ func (a *AdminApp) adminUpdateModel(c *gin.Context) {
 	var req model.UpdateAdminModelRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		NewResponseHelper(c).Error(CodeInvalidParam, "invalid request")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
 		return
 	}
 
 	// 检查模型是否存在
 	var modelData model.Model
 	if err := a.db.First(&modelData, "id = ?", modelID).Error; err != nil {
-		NewResponseHelper(c).Error(CodeNotFound, "model not found")
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "model not found")
 		return
 	}
 
@@ -389,18 +396,18 @@ func (a *AdminApp) adminUpdateModel(c *gin.Context) {
 	updates["description"] = req.Description
 
 	if len(updates) == 0 {
-		NewResponseHelper(c).Error(CodeInvalidParam, "no fields to update")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "no fields to update")
 		return
 	}
 
 	if err := a.db.Model(&modelData).Updates(updates).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to update model")
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to update model")
 		return
 	}
 
 	// 重新获取更新后的模型数据
 	a.db.First(&modelData, "id = ?", modelID)
-	NewResponseHelper(c).Success(modelData)
+	response.NewResponseHelper(c).Success(modelData)
 }
 
 // adminToggleModelStatus 切换模型状态
@@ -411,23 +418,23 @@ func (a *AdminApp) adminToggleModelStatus(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		NewResponseHelper(c).Error(CodeInvalidParam, "invalid request")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
 		return
 	}
 
 	// 检查模型是否存在
 	var modelData model.Model
 	if err := a.db.First(&modelData, "id = ?", modelID).Error; err != nil {
-		NewResponseHelper(c).Error(CodeNotFound, "model not found")
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "model not found")
 		return
 	}
 
 	if err := a.db.Model(&modelData).Update("status", req.Status).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to update model status")
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to update model status")
 		return
 	}
 
-	NewResponseHelper(c).Success(gin.H{"status": req.Status})
+	response.NewResponseHelper(c).Success(gin.H{"status": req.Status})
 }
 
 // adminDeleteModel 删除模型
@@ -437,7 +444,7 @@ func (a *AdminApp) adminDeleteModel(c *gin.Context) {
 	// 检查模型是否存在
 	var modelData model.Model
 	if err := a.db.First(&modelData, "id = ?", modelID).Error; err != nil {
-		NewResponseHelper(c).Error(CodeNotFound, "model not found")
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "model not found")
 		return
 	}
 
@@ -445,17 +452,17 @@ func (a *AdminApp) adminDeleteModel(c *gin.Context) {
 	var messageCount int64
 	a.db.Model(&model.Message{}).Where("model_id = ?", modelID).Count(&messageCount)
 	if messageCount > 0 {
-		NewResponseHelper(c).Error(CodeForbidden, "cannot delete model with associated messages")
+		response.NewResponseHelper(c).Error(response.CodeForbidden, "cannot delete model with associated messages")
 		return
 	}
 
 	// 删除模型
 	if err := a.db.Delete(&modelData).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, "failed to delete model")
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to delete model")
 		return
 	}
 
-	NewResponseHelper(c).Success(gin.H{"message": "model deleted successfully"})
+	response.NewResponseHelper(c).Success(gin.H{"message": "model deleted successfully"})
 }
 
 // registerAdminRoutes 注册管理员路由

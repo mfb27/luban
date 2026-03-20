@@ -41,14 +41,148 @@ const state = {
   isAuthenticated: false,
 };
 
-function setError(msg) {
+// 错误类型枚举
+const ErrorType = {
+  NETWORK: 'network',
+  AUTH: 'auth',
+  VALIDATION: 'validation',
+  SERVER: 'server',
+  DEFAULT: 'default'
+};
+
+// 错误提示配置
+const ErrorMessages = {
+  // 网络错误
+  NETWORK: {
+    default: '网络连接失败，请检查网络',
+    timeout: '请求超时，请稍后重试',
+    offline: '网络已断开，请检查网络连接'
+  },
+  // 认证错误
+  AUTH: {
+    expired: '登录已过期，请重新登录',
+    invalid: '用户名或密码错误',
+    forbidden: '没有权限访问此资源',
+    noToken: '请先登录'
+  },
+  // 验证错误
+  VALIDATION: {
+    required: '此字段为必填项',
+    invalid: '输入格式不正确',
+    tooShort: '内容太短',
+    tooLong: '内容太长',
+    fileTooLarge: '文件大小超过限制',
+    fileTypeInvalid: '文件类型不支持'
+  },
+  // 服务器错误
+  SERVER: {
+    default: '服务器错误，请稍后重试',
+    database: '数据库错误',
+    upload: '上传失败',
+    notFound: '资源不存在'
+  }
+};
+
+// 设置错误提示
+function setError(msg, type = ErrorType.DEFAULT, duration = 5000) {
   if (!msg) {
-    els.errorBar.classList.add("hidden");
-    els.errorBar.textContent = "";
+    hideError();
     return;
   }
-  els.errorBar.classList.remove("hidden");
+
+  // 移除旧的错误类型
+  els.errorBar.classList.remove('error-toast', 'error-network', 'error-auth', 'error-validation');
+
+  // 设置错误消息
   els.errorBar.textContent = msg;
+  els.errorBar.classList.remove("hidden");
+
+  // 添加错误类型样式
+  if (type !== ErrorType.DEFAULT) {
+    els.errorBar.classList.add(`error-${type}`);
+  }
+
+  // 如果是toast类型，添加固定定位样式
+  if (type === ErrorType.NETWORK || type === ErrorType.AUTH) {
+    els.errorBar.classList.add('error-toast');
+  }
+
+  // 自动隐藏错误
+  if (duration > 0) {
+    clearTimeout(window.errorTimeout);
+    window.errorTimeout = setTimeout(() => {
+      hideError();
+    }, duration);
+  }
+}
+
+// 隐藏错误提示
+function hideError() {
+  els.errorBar.classList.add("hidden");
+  els.errorBar.classList.remove('error-toast', 'error-network', 'error-auth', 'error-validation');
+  clearTimeout(window.errorTimeout);
+}
+
+// 显示网络错误
+function showNetworkError(error) {
+  let message = ErrorMessages.NETWORK.default;
+
+  if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+    message = ErrorMessages.NETWORK.offline;
+  } else if (error.name === 'TimeoutError') {
+    message = ErrorMessages.NETWORK.timeout;
+  }
+
+  setError(message, ErrorType.NETWORK, 8000);
+}
+
+// 显示认证错误
+function showAuthError(error) {
+  let message = ErrorMessages.AUTH.invalid;
+
+  if (error.message.includes('expired') || error.message.includes('token')) {
+    message = ErrorMessages.AUTH.expired;
+  } else if (error.message.includes('forbidden')) {
+    message = ErrorMessages.AUTH.forbidden;
+  } else if (error.message.includes('unauthorized')) {
+    message = ErrorMessages.AUTH.noToken;
+  }
+
+  setError(message, ErrorType.AUTH, 5000);
+}
+
+// 显示验证错误
+function showValidationError(field, error) {
+  let message = ErrorMessages.VALIDATION.invalid;
+
+  if (error.includes('required')) {
+    message = ErrorMessages.VALIDATION.required;
+  } else if (error.includes('too short')) {
+    message = ErrorMessages.VALIDATION.tooShort;
+  } else if (error.includes('too long')) {
+    message = ErrorMessages.VALIDATION.tooLong;
+  } else if (error.includes('file size')) {
+    message = ErrorMessages.VALIDATION.fileTooLarge;
+  } else if (error.includes('file type')) {
+    message = ErrorMessages.VALIDATION.fileTypeInvalid;
+  }
+
+  setError(`${field}: ${message}`, ErrorType.VALIDATION, 4000);
+}
+
+// 显示服务器错误
+function showServerError(error) {
+  let message = ErrorMessages.SERVER.default;
+
+  if (error.message.includes('database')) {
+    message = ErrorMessages.SERVER.database;
+  } else if (error.message.includes('upload')) {
+    message = ErrorMessages.SERVER.upload;
+  } else if (error.message.includes('404') || error.message.includes('not found')) {
+    message = ErrorMessages.SERVER.notFound;
+  }
+
+  setError(message, ErrorType.SERVER, 5000);
 }
 
 function setTheme(theme) {
@@ -81,6 +215,10 @@ function getApiBaseUrl() {
 // API base URL
 const API_BASE_URL = getApiBaseUrl();
 
+// 请求超时时间（毫秒）
+const API_TIMEOUT = 10000;
+
+// API请求函数
 async function api(path, options = {}) {
   const token = localStorage.getItem("token");
   const headers = {
@@ -94,21 +232,86 @@ async function api(path, options = {}) {
   }
 
   const url = API_BASE_URL + path;
-  const res = await fetch(url, {
-    ...options,
-    headers,
-  });
-  const isJSON = (res.headers.get("content-type") || "").includes("application/json");
-  const body = isJSON ? await res.json() : await res.text();
 
-  // Consider 2xx status codes as successful
-  if (res.status >= 200 && res.status < 300) {
-    return body;
+  // 创建AbortController用于超时控制
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    const isJSON = (res.headers.get("content-type") || "").includes("application/json");
+    const body = isJSON ? await res.json() : await res.text();
+
+    // Consider 2xx status codes as successful
+    if (res.status >= 200 && res.status < 300) {
+      // Extract data from APIResponse structure if present
+      if (body && body.data !== undefined) {
+        return body.data;
+      }
+      return body;
+    }
+
+    // 处理特定的HTTP状态码
+    let error = new Error();
+
+    if (res.status === 401 && !path.startsWith("/api/auth/")) {
+      error.name = 'AuthError';
+      error.message = body?.message || '认证失败，请检查登录状态';
+      // 只有在非登录接口返回401时才清除token并刷新
+      localStorage.removeItem("token");
+      state.isAuthenticated = false;
+      state.me = null;
+      window.location.reload();
+      throw error;
+    } else if (res.status === 401 && path.startsWith("/api/auth/")) {
+      // 登录接口返回401，显示错误但不刷新页面
+      error.name = 'AuthError';
+      error.message = body?.message || '邮箱或密码错误';
+    } else if (res.status === 403) {
+      error.name = 'AuthError';
+      error.message = body?.message || '没有权限访问此资源';
+    } else if (res.status === 404) {
+      error.name = 'ServerError';
+      error.message = body?.message || '请求的资源不存在';
+    } else if (res.status >= 500) {
+      error.name = 'ServerError';
+      error.message = body?.message || '服务器内部错误，请稍后重试';
+    } else {
+      // 其他错误
+      error.name = 'APIError';
+      error.message = body?.message || body?.error || `HTTP ${res.status}: ${res.statusText}`;
+    }
+
+    throw error;
+  } catch (err) {
+    clearTimeout(timeoutId);
+
+    // 处理不同的错误类型
+    if (err.name === 'AuthError') {
+      showAuthError(err);
+    } else if (err.name === 'ServerError') {
+      showServerError(err);
+    } else if (err.name === 'AbortError' || err.message.includes('aborted')) {
+      // 超时错误
+      const timeoutError = new Error('请求超时，请检查网络连接');
+      timeoutError.name = 'NetworkError';
+      showNetworkError(timeoutError);
+    } else if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+      // 网络连接错误
+      showNetworkError(err);
+    } else {
+      // 默认错误处理
+      setError(err.message || '请求失败');
+    }
+
+    throw err; // 重新抛出错误以便调用者处理
   }
-
-  // For error status codes
-  const msg = body?.error || body || `HTTP ${res.status}`;
-  throw new Error(msg);
 }
 
 async function loadMe() {
@@ -437,6 +640,20 @@ async function uploadFile(file) {
   const fd = new FormData();
   fd.append("file", file);
 
+  // 检查文件大小（限制为50MB）
+  const maxSize = 50 * 1024 * 1024;
+  if (file.size > maxSize) {
+    showValidationError('文件', ErrorMessages.VALIDATION.fileTooLarge);
+    return;
+  }
+
+  // 检查文件类型
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm'];
+  if (!allowedTypes.includes(file.type)) {
+    showValidationError('文件', ErrorMessages.VALIDATION.fileTypeInvalid);
+    return;
+  }
+
   // Get token for authenticated request
   const token = localStorage.getItem("token");
   const headers = {};
@@ -446,15 +663,38 @@ async function uploadFile(file) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch("/api/upload", {
-    method: "POST",
-    headers,
-    body: fd
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-  state.attachmentURLs.push(body.url);
-  renderAttachments();
+  try {
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers,
+      body: fd
+    });
+
+    const body = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const error = new Error(body.message || body.error || `HTTP ${res.status}`);
+      if (res.status === 413) {
+        error.name = 'ValidationError';
+        error.message = ErrorMessages.VALIDATION.fileTooLarge;
+      } else if (res.status === 415) {
+        error.name = 'ValidationError';
+        error.message = ErrorMessages.VALIDATION.fileTypeInvalid;
+      }
+      throw error;
+    }
+
+    // APIResponse format - extract data
+    const uploadData = body.data || body;
+    state.attachmentURLs.push(uploadData.url);
+    renderAttachments();
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+      showValidationError('文件', err.message);
+    } else {
+      showServerError(err);
+    }
+  }
 }
 
 function bindEvents() {
@@ -494,6 +734,45 @@ function bindEvents() {
   // Password strength indicator
   els.registerPassword.addEventListener("input", (e) => {
     checkPasswordStrength(e.target.value);
+  });
+
+  // Form validation
+  els.registerName.addEventListener("blur", () => {
+    if (!els.registerName.value.trim()) {
+      showValidationError('姓名', ErrorMessages.VALIDATION.required);
+    }
+  });
+
+  els.registerEmail.addEventListener("blur", () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!els.registerEmail.value.trim()) {
+      showValidationError('邮箱', ErrorMessages.VALIDATION.required);
+    } else if (!emailRegex.test(els.registerEmail.value)) {
+      showValidationError('邮箱', ErrorMessages.VALIDATION.invalid);
+    }
+  });
+
+  els.loginEmail.addEventListener("blur", () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!els.loginEmail.value.trim()) {
+      showValidationError('邮箱', ErrorMessages.VALIDATION.required);
+    } else if (!emailRegex.test(els.loginEmail.value)) {
+      showValidationError('邮箱', ErrorMessages.VALIDATION.invalid);
+    }
+  });
+
+  els.registerPassword.addEventListener("blur", () => {
+    if (!els.registerPassword.value) {
+      showValidationError('密码', ErrorMessages.VALIDATION.required);
+    } else if (els.registerPassword.value.length < 6) {
+      showValidationError('密码', ErrorMessages.VALIDATION.tooShort);
+    }
+  });
+
+  els.loginPassword.addEventListener("blur", () => {
+    if (!els.loginPassword.value) {
+      showValidationError('密码', ErrorMessages.VALIDATION.required);
+    }
   });
 
   els.sendBtn.addEventListener("click", send);
@@ -572,7 +851,7 @@ function handleLogin(e) {
     body: JSON.stringify({ email, password }),
   })
     .then(res => {
-      // Login returns 200 with response containing token and user info
+      // Login returns 200 with APIResponse containing data
       state.me = {
         id: res.user_id,
         name: res.name,
@@ -586,7 +865,8 @@ function handleLogin(e) {
       updateUIAfterAuth();
     })
     .catch(err => {
-      setError(err.message || "登录失败");
+      // 错误已经在api函数中处理并显示在页面上
+      // 不要关闭对话框，让用户看到错误
     });
 }
 
@@ -640,7 +920,7 @@ function handleRegister(e) {
     body: JSON.stringify({ name, email, password }),
   })
     .then(res => {
-      // Registration returns 201 with response containing token and user info
+      // Registration returns 200 with APIResponse containing data
       state.me = {
         id: res.user_id,
         name: res.name,
@@ -654,7 +934,8 @@ function handleRegister(e) {
       updateUIAfterAuth();
     })
     .catch(err => {
-      setError(err.message || "注册失败");
+      // 错误已经在api函数中处理
+      console.error("Register error:", err);
     });
 }
 
@@ -665,6 +946,9 @@ function switchAuthTab(tab) {
 
   els.loginForm.classList.toggle("hidden", tab !== "login");
   els.registerForm.classList.toggle("hidden", tab !== "register");
+
+  // 清除之前的错误提示
+  setError("");
 
   // Auto-focus appropriate input
   setTimeout(() => {

@@ -12,6 +12,7 @@ import (
 	"github.com/mfb27/luban/internal/auth"
 	"github.com/mfb27/luban/internal/middleware"
 	"github.com/mfb27/luban/internal/model"
+	"github.com/mfb27/luban/internal/response"
 	"github.com/mfb27/luban/internal/zhipu"
 	"go.uber.org/zap"
 )
@@ -58,12 +59,12 @@ func (a *App) postChat(c *gin.Context) {
 				middleware.GetErrorField(err),
 			)
 		}
-		NewResponseHelper(c).Error(CodeInvalidParam, "invalid json")
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid json")
 		return
 	}
 	req.Content = strings.TrimSpace(req.Content)
 	if req.Content == "" {
-		NewResponseHelper(c).Error(CodeRequiredParam, "content required")
+		response.NewResponseHelper(c).Error(response.CodeRequiredParam, "content required")
 		return
 	}
 	if req.ModelID == "" {
@@ -95,14 +96,14 @@ func (a *App) postChat(c *gin.Context) {
 			UpdatedAt: now,
 		}
 		if err := a.db.Create(&s).Error; err != nil {
-			NewResponseHelper(c).Error(CodeInternal, err.Error())
+			response.NewResponseHelper(c).Error(response.CodeInternal, err.Error())
 			return
 		}
 	} else {
 		// Check if session exists
 		var session model.Session
 		if err := a.db.First(&session, "id = ?", sessionID).Error; err != nil {
-			NewResponseHelper(c).Error(CodeNotFound, "session not found")
+			response.NewResponseHelper(c).Error(response.CodeNotFound, "session not found")
 			return
 		}
 
@@ -111,12 +112,12 @@ func (a *App) postChat(c *gin.Context) {
 			// User is authenticated
 			if session.UserID != "" && session.UserID != userID {
 				// Session belongs to a different user
-				NewResponseHelper(c).Error(CodeForbidden, "unauthorized to access this session")
+				response.NewResponseHelper(c).Error(response.CodeForbidden, "unauthorized to access this session")
 				return
 			} else if session.UserID == "" {
 				// Convert anonymous session to authenticated session
 				if err := a.db.Model(&session).Update("user_id", userID).Error; err != nil {
-					NewResponseHelper(c).Error(CodeInternal, "failed to convert session to authenticated")
+					response.NewResponseHelper(c).Error(response.CodeInternal, "failed to convert session to authenticated")
 					return
 				}
 			}
@@ -124,7 +125,7 @@ func (a *App) postChat(c *gin.Context) {
 			// User is not authenticated
 			if session.UserID != "" {
 				// Trying to access an authenticated session anonymously
-				NewResponseHelper(c).Error(CodeForbidden, "authentication required to access this session")
+				response.NewResponseHelper(c).Error(response.CodeForbidden, "authentication required to access this session")
 				return
 			}
 		}
@@ -147,7 +148,7 @@ func (a *App) postChat(c *gin.Context) {
 		CreatedAt: now,
 	}
 	if err := a.db.Create(&userMsg).Error; err != nil {
-		NewResponseHelper(c).Error(CodeDatabaseError, err.Error())
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, err.Error())
 		return
 	}
 
@@ -163,7 +164,7 @@ func (a *App) postChat(c *gin.Context) {
 				middleware.GetErrorField(err),
 			)
 		}
-		NewResponseHelper(c).Error(CodeDatabaseError, err.Error())
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, err.Error())
 		return
 	}
 

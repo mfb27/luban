@@ -3,13 +3,13 @@ package handler
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mfb27/luban/internal/admin"
 	"github.com/mfb27/luban/internal/config"
 	"github.com/mfb27/luban/internal/middleware"
 	"github.com/mfb27/luban/internal/model"
+	"github.com/mfb27/luban/internal/response"
 	"github.com/mfb27/luban/internal/storage"
 	"github.com/mfb27/luban/internal/zhipu"
 	"github.com/redis/go-redis/v9"
@@ -90,7 +90,7 @@ func NewApp(deps AppDeps) (*App, error) {
 func (a *App) registerRoutes() {
 	// Health check endpoint
 	a.Engine.GET("/api/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"ok": true})
+		response.NewResponseHelper(c).Success(gin.H{"ok": true})
 	})
 
 	// Public routes

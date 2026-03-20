@@ -13,14 +13,14 @@ func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			c.JSON(http.StatusUnauthorized, gin.H{"code": 30000003, "message": "Authorization header required", "requestId": GetRequestID(c)})
 			c.Abort()
 			return
 		}
 
 		// Check if the header starts with "Bearer "
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
+			c.JSON(http.StatusUnauthorized, gin.H{"code": 30000002, "message": "Invalid authorization format", "requestId": GetRequestID(c)})
 			c.Abort()
 			return
 		}
@@ -31,7 +31,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Validate token
 		claims, err := auth.ValidateToken(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			c.JSON(http.StatusUnauthorized, gin.H{"code": 30000001, "message": "Invalid or expired token", "requestId": GetRequestID(c)})
 			c.Abort()
 			return
 		}

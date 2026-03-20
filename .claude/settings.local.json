@@ -24,7 +24,10 @@
       "Bash(git commit:*)",
       "Bash(start index.html)",
       "Bash(./luban server:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8080)"
     ]
   }
 }

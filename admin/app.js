@@ -52,6 +52,10 @@ async function api(path, options = {}) {
         const body = isJSON ? await response.json() : await response.text();
 
         if (response.status >= 200 && response.status < 300) {
+            // Extract data from APIResponse structure if present
+            if (body && body.data !== undefined) {
+                return body.data;
+            }
             return body;
         }
 
@@ -61,6 +65,10 @@ async function api(path, options = {}) {
             throw new Error('登录已过期，请重新登录');
         }
 
+        // 检查是否是 APIResponse 错误格式
+        if (body?.message) {
+            throw new Error(body.message);
+        }
         throw new Error(body?.error || body || `HTTP ${response.status}`);
     } catch (error) {
         console.error('API请求失败:', error);
@@ -142,9 +150,9 @@ async function loadDashboard() {
         console.log('仪表板用户数据:', usersData);
         console.log('仪表板模型数据:', modelsData);
 
-        // 从返回的数据中提取数组
-        const users = usersData.data.users || [];
-        const models = modelsData.data.models || [];
+        // api() 函数已自动提取 data 字段，直接使用
+        const users = usersData.users || [];
+        const models = modelsData.models || [];
 
         console.log('提取的用户数组:', users);
         console.log('提取的模型数组:', models);
@@ -258,7 +266,8 @@ async function loadUsers() {
             return;
         }
 
-        const users = userData.data.users || [];
+        // api() 函数已自动提取 data 字段，直接使用
+        const users = userData.users || [];
         console.log('提取的用户数组:', users);
         console.log('用户数组长度:', users.length);
 
@@ -382,7 +391,8 @@ async function loadModels() {
             return;
         }
 
-        const models = modelData.data.models || [];
+        // api() 函数已自动提取 data 字段，直接使用
+        const models = modelData.models || [];
         console.log('提取的模型数组:', models);
         console.log('模型数组长度:', models.length);
 

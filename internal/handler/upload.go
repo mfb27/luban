@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"net/http"
 	"path"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/mfb27/luban/internal/model"
+	"github.com/mfb27/luban/internal/response"
 	"github.com/minio/minio-go/v7"
 )
 
@@ -24,14 +24,14 @@ type uploadResp struct {
 func (a *App) upload(c *gin.Context) {
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "file required"})
+		response.NewResponseHelper(c).Error(response.CodeRequiredParam, "file required")
 		return
 	}
 	defer file.Close()
 
 	tp := sniffType(header)
 	if tp != "image" && tp != "video" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "only image/video allowed"})
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "only image/video allowed")
 		return
 	}
 
@@ -45,13 +45,13 @@ func (a *App) upload(c *gin.Context) {
 		ContentType: header.Header.Get("Content-Type"),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.NewResponseHelper(c).Error(response.CodeUploadFailed, err.Error())
 		return
 	}
 
 	urlStr, err := a.minio.PublicURL(objectKey)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.NewResponseHelper(c).Error(response.CodeUploadFailed, err.Error())
 		return
 	}
 
@@ -64,11 +64,11 @@ func (a *App) upload(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 	if err := a.db.Create(&att).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, uploadResp{ID: att.ID, URL: att.URL})
+	response.NewResponseHelper(c).Success(uploadResp{ID: att.ID, URL: att.URL})
 }
 
 func sniffType(header *multipart.FileHeader) string {
