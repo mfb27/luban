@@ -575,6 +575,8 @@ func (a *App) registerAdminRoutes() {
 		adminGroup.PUT("/users/:id", adminApp.adminUpdateUser)
 		adminGroup.PATCH("/users/:id/status", adminApp.adminToggleUserStatus)
 		adminGroup.DELETE("/users/:id", adminApp.adminDeleteUser)
+		adminGroup.PUT("/users/batch/status", adminApp.adminBatchUpdateUserStatus)
+		adminGroup.DELETE("/users/batch", adminApp.adminBatchDeleteUsers)
 
 		// 模型管理
 		adminGroup.GET("/models", adminApp.adminGetModels)
