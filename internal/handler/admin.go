@@ -609,6 +609,77 @@ func (a *AdminApp) adminBatchActivateModels(c *gin.Context) {
 	}
 }
 
+// adminBatchDeactivateModels 批量禁用模型
+func (a *AdminApp) adminBatchDeactivateModels(c *gin.Context) {
+	var req struct {
+		ModelIDs []string `json:"model_ids" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
+		return
+	}
+
+	if len(req.ModelIDs) == 0 {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "model_ids cannot be empty")
+		return
+	}
+
+	// 开始事务
+	tx := a.db.Begin()
+	if tx.Error != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to start transaction")
+		return
+	}
+
+	var failedDeactivations []string
+	var successCount int
+
+	for _, modelID := range req.ModelIDs {
+		// 检查模型是否存在
+		var modelData model.Model
+		if err := tx.First(&modelData, "id = ?", modelID).Error; err != nil {
+			failedDeactivations = append(failedDeactivations, modelID)
+			continue
+		}
+
+		// 检查模型是否已经是禁用状态
+		if modelData.Status == "inactive" {
+			failedDeactivations = append(failedDeactivations, modelID)
+			continue
+		}
+
+		// 更新模型状态为inactive
+		if err := tx.Model(&modelData).Update("status", "inactive").Error; err != nil {
+			failedDeactivations = append(failedDeactivations, modelID)
+			continue
+		}
+
+		successCount++
+	}
+
+	// 提交事务
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to commit transaction")
+		return
+	}
+
+	if len(failedDeactivations) > 0 {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":           "partial deactivation completed",
+			"success_count":     successCount,
+			"failed_ids":        failedDeactivations,
+			"failed_reason":     "some models could not be deactivated (either not found or already inactive)",
+		})
+	} else {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":           "all models deactivated successfully",
+			"deactivated_count": successCount,
+		})
+	}
+}
+
 // registerAdminRoutes 注册管理员路由
 func (a *App) registerAdminRoutes() {
 	// 创建管理员应用
@@ -638,8 +709,11 @@ func (a *App) registerAdminRoutes() {
 		adminGroup.PUT("/models/:id", adminApp.adminUpdateModel)
 		adminGroup.PATCH("/models/:id/status", adminApp.adminToggleModelStatus)
 		adminGroup.DELETE("/models/:id", adminApp.adminDeleteModel)
-		adminGroup.DELETE("/models/batch", adminApp.adminBatchDeleteModels)
-	adminGroup.PATCH("/models/batch/activate", adminApp.adminBatchActivateModels)
+
+		// 批量操作
+		adminGroup.POST("/models/batch/delete", adminApp.adminBatchDeleteModels)
+		adminGroup.POST("/models/batch/activate", adminApp.adminBatchActivateModels)
+		adminGroup.POST("/models/batch/deactivate", adminApp.adminBatchDeactivateModels)
 	}
 
 	// Serve admin index page (public)
