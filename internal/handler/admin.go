@@ -321,6 +321,49 @@ func (a *AdminApp) adminBatchUpdateUserStatus(c *gin.Context) {
 	})
 }
 
+// adminBatchDeleteUsers 批量删除用户
+func (a *AdminApp) adminBatchDeleteUsers(c *gin.Context) {
+	var req model.BatchDeleteRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, err.Error())
+		return
+	}
+
+	// 去重用户ID
+	uniqueUserIDs := make(map[string]bool)
+	for _, id := range req.UserIDs {
+		uniqueUserIDs[id] = true
+	}
+	req.UserIDs = make([]string, 0, len(uniqueUserIDs))
+	for id := range uniqueUserIDs {
+		req.UserIDs = append(req.UserIDs, id)
+	}
+
+	// 验证所有用户存在
+	var count int64
+	if err := a.db.Model(&model.User{}).Where("id IN ?", req.UserIDs).Count(&count).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to verify users")
+		return
+	}
+	if int(count) != len(req.UserIDs) {
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "one or more users not found")
+		return
+	}
+
+	// 批量删除
+	result := a.db.Where("id IN ?", req.UserIDs).Delete(&model.User{})
+
+	if result.Error != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to delete users")
+		return
+	}
+
+	response.NewResponseHelper(c).Success(gin.H{
+		"deleted_count": result.RowsAffected,
+	})
+}
+
 // adminGetModels 获取模型列表
 func (a *AdminApp) adminGetModels(c *gin.Context) {
 	// NEW VERSION - This should be executed now
