@@ -29,7 +29,8 @@
       "Bash(netstat -ano)",
       "Bash(findstr :8080)",
       "Bash(go test:*)",
-      "Bash(start:*)"
+      "Bash(start:*)",
+      "Read(//d/space/**)"
     ]
   }
 }

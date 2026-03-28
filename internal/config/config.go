@@ -13,7 +13,6 @@ type Config struct {
 	MySQL   MySQLConfig   `mapstructure:"mysql"`
 	Redis   RedisConfig   `mapstructure:"redis"`
 	MinIO   MinIOConfig   `mapstructure:"minio"`
-	Web     WebConfig     `mapstructure:"web"`
 	ZhipuAI ZhipuAIConfig `mapstructure:"zhipuai"`
 	Admin   AdminConfig   `mapstructure:"admin"`
 }
@@ -21,10 +20,6 @@ type Config struct {
 type ServerConfig struct {
 	Host string `mapstructure:"host"`
 	Port int    `mapstructure:"port"`
-}
-
-type WebConfig struct {
-	StaticDir string `mapstructure:"static_dir"`
 }
 
 type LogConfig struct {
@@ -56,8 +51,8 @@ type ZhipuAIConfig struct {
 }
 
 type AdminConfig struct {
-	SecretKey      string               `mapstructure:"secret_key"`
-	InitialAdmin   InitialAdminConfig   `mapstructure:"initial_admin"`
+	SecretKey    string             `mapstructure:"secret_key"`
+	InitialAdmin InitialAdminConfig `mapstructure:"initial_admin"`
 }
 
 type InitialAdminConfig struct {
@@ -109,4 +104,3 @@ func Load() (*Config, error) {
 
 	return &cfg, nil
 }
-

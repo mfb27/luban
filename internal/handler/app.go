@@ -125,15 +125,15 @@ func (a *App) registerRoutes() {
 	// Register admin routes
 	a.registerAdminRoutes()
 
-	// static
-	staticDir := a.cfg.Web.StaticDir
-	if staticDir == "" {
-		staticDir = "./frontend"
-	}
+	// // static
+	// staticDir := a.cfg.Web.StaticDir
+	// if staticDir == "" {
+	// 	staticDir = "./frontend"
+	// }
 
-	// Serve main frontend
-	a.Engine.StaticFile("/", "./frontend/index.html")
-	a.Engine.Static("/assets", "./frontend/assets")
+	// // Serve main frontend
+	// a.Engine.StaticFile("/", "./frontend/index.html")
+	// a.Engine.Static("/assets", "./frontend/assets")
 }
 
 // migrateSessions adds user_id to existing sessions
