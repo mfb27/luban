@@ -2,132 +2,157 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## 项目概述
 
-Luban is a Go-based chat application that provides a web interface for conversing with AI models. The application uses a clean architecture with分层分层 structure, featuring MySQL for data persistence, Redis for caching, and MinIO for file storage.
+Luban 是一个基于 Go 语言开发的智能聊天应用，提供与智谱 AI (ZhipuAI) 模型对话的 Web 界面。应用采用 Gin 框架，使用 MySQL 进行数据持久化，Redis 缓存，MinIO 文件存储，并包含完整的后台管理系统。
 
-## Common Commands
+## 常用命令
 
-### Building and Running
+### 构建和运行
 ```bash
-# Build the application
+# 构建应用
 go build -o luban ./cmd
 
-# Run the server directly
+# 直接运行服务器
 go run ./cmd/server.go
 
-# Run with custom config
+# 使用自定义配置运行
 go run ./cmd/server.go --config ./config.yaml
 
-# Using the CLI
+# 使用 CLI
 ./luban server --config ./config.yaml
 ```
 
-### Development Setup
+### 开发环境
 ```bash
-# Start dependencies with Docker Compose
+# 启动依赖服务
 docker-compose up -d
 
-# The application will be available at:
+# 应用地址:
 # - HTTP: http://localhost:8080
 # - MinIO Console: http://localhost:9001
 ```
 
-### Testing
+### 测试
 ```bash
-# Run tests
+# 运行所有测试
 go test ./...
 
-# Run tests with verbose output
+# 详细输出
 go test -v ./...
 
-# Run a specific test file
+# 运行特定包的测试
 go test ./internal/handler
+
+# 运行单个测试
+go test -v -run TestFunctionName ./...
 ```
 
-## Architecture
+## 核心架构
 
-### Core Structure
-- **cmd/**: Entry points and CLI commands (root.go, server.go)
-- **internal/**: Private application code
-  - **handler/**: HTTP handlers and route registration
-  - **model/**: Data models and business logic
-  - **config/**: Configuration management
-  - **cache/**: Redis caching implementation
-  - **storage/**: MinIO file storage
-  - **logger/**: Logging configuration
-- **web/**: Frontend static files
+### 目录结构
+- **cmd/**: 入口点和 CLI 命令 (root.go, server.go)
+- **internal/**: 私有应用代码
+  - **handler/**: HTTP 处理器和路由注册
+  - **model/**: GORM 数据模型
+  - **config/**: Viper 配置管理
+  - **cache/**: Redis 缓存
+  - **storage/**: MinIO 文件存储
+  - **logger/**: Zap 日志配置
+  - **middleware/**: Gin 中间件 (认证、日志、CORS)
+  - **response/**: 统一 API 响应结构
+  - **admin/**: 管理员认证服务
+  - **auth/**: 用户认证
+  - **zhipu/**: 智谱 AI 客户端
 
-### Key Components
-
-#### AppDeps Pattern
-Dependencies are injected via `AppDeps` struct in `internal/handler/app.go`:
+### App 结构 (internal/handler/app.go)
+依赖通过 `AppDeps` 注入，应用启动时初始化：
 ```go
-type AppDeps struct {
-    Cfg   *config.Config
-    Log   *zap.Logger
-    DB    *gorm.DB
-    Redis *redis.Client
-    MinIO *storage.MinIO
+type App struct {
+    Engine           *gin.Engine
+    adminAuthService *admin.AdminAuthService
+    cfg              *config.Config
+    log              *zap.Logger
+    db               *gorm.DB
+    redis            *redis.Client
+    minio            *storage.MinIO
+    zhipu            *zhipu.Client
 }
 ```
 
-#### Handler Registration
-Routes are registered in `registerRoutes()` method:
-- `/api/chat`: Main chat endpoint (POST)
-- `/api/models`: List available models
-- `/api/sessions`: Session management
-- `/api/upload`: File upload to MinIO
+### 路由注册
+API 路由在 `registerRoutes()` 中注册：
+- `/api/health`: 健康检查
+- `/api/auth/register`, `/api/auth/login`: 用户认证
+- `/api/models`: 获取模型列表 (公开)
+- `/api/chat`: 聊天接口 (支持 SSE 流式响应)
+- `/api/user/me`: 用户信息 (需认证)
+- `/api/sessions`: 会话管理 (需认证)
+- `/api/upload`: 文件上传 (需认证)
+- `/api/admin/*`: 后台管理 API (需管理员认证)
 
-#### Data Models
-The application uses GORM models:
-- `Session`: Chat sessions with model_id and title
-- `Message`: Individual messages with role (user/assistant)
-- `User`: User profiles (not fully implemented)
-- `Model`: Available AI models
-- `Attachment`: File metadata for uploads
+### 后台管理系统
+管理员功能在 `internal/handler/admin.go` 中实现：
+- 用户管理: 列表、创建、更新、删除、批量操作
+- 模型管理: 列表、创建、更新、删除、批量操作
+- JWT 认证: 管理员登录使用 JWT，24 小时过期
+- 初始管理员: 首次启动时自动创建 (配置在 config.yaml)
 
-### Configuration
+### 数据模型 (GORM)
+- `Session`: 聊天会话 (id, user_id, title, model_id)
+- `Message`: 消息 (id, session_id, user_id, role, content)
+- `User`: 用户 (id, name, email, password_hash, status)
+- `Model`: AI 模型 (id, name, model_id, status, description)
+- `Attachment`: 文件附件 (id, bucket, object_key, url, type)
+- `Admin`: 管理员 (id, name, email, password, status)
 
-Configuration is loaded via Viper with support for:
-- YAML files (config.yaml)
-- Environment variables (prefixed with `LUBAN_`)
-- Default values for missing settings
-
-Key config sections:
-- `server`: HTTP server settings
-- `mysql`: Database connection
-- `redis`: Cache configuration
-- `minio`: File storage settings
-- `web`: Static file serving
-
-### Current Implementation Notes
-
-1. **Chat Endpoint**: Currently returns mock responses. Needs integration with actual AI model APIs.
-2. **Model Management**: Basic model listing exists but no real model adapters implemented.
-3. **Authentication**: No user authentication system implemented.
-4. **Frontend**: Simple HTML/JS interface without build step.
-
-## Database Schema
-
-The application auto-migrates these tables on startup:
-- sessions (id, title, model_id, created_at, updated_at)
-- messages (id, session_id, role, content, created_at)
-- users (id, name, avatar_url, created_at, updated_at)
-- models (id, name, created_at, updated_at)
-- attachments (id, bucket, object_key, url, type, created_at)
-
-## Important Patterns
-
-1. **Dependency Injection**: All dependencies are injected, not created locally.
-2. **Graceful Shutdown**: Uses context with timeout for clean shutdown.
-3. **Structured Logging**: Uses Zap logger with structured fields.
-4. **Configuration Binding**: Uses Viper for config with mapstructure binding.
-5. **API Response Structure**: All API responses must use the `APIResponse` struct for consistency. Example:
+### 统一响应结构 (internal/response/response.go)
+所有 API 必须使用 `APIResponse` 结构：
 ```go
 type APIResponse struct {
-    Code    int         `json:"code"`
-    Message string      `json:"message"`
-    Data    interface{} `json:"data"`
+    Code      int         `json:"code"`      // 8位自定义状态码
+    Message   string      `json:"message"`
+    Data      interface{} `json:"data,omitempty"`
+    RequestID string      `json:"requestId"` // 请求追踪 ID
 }
 ```
+响应码分类：
+- `0`: 成功
+- `1xxxxxxx`: 客户端错误
+- `2xxxxxxx`: 服务端错误
+- `3xxxxxxx`: 认证错误
+- `4xxxxxxx`: 权限错误
+- `5xxxxxxx`: 业务错误
+
+使用 `response.NewResponseHelper(c)` 简化响应处理。
+
+### 智谱 AI 集成 (internal/zhipu/client.go)
+- 支持流式和非流式聊天
+- JWT Token 自动生成 (按智谱 AI 规范)
+- SSE 流式响应处理
+
+### 配置管理 (config.yaml)
+配置通过 Viper 加载，支持环境变量覆盖 (`LUBAN_` 前缀):
+- `server`: HTTP 服务器配置
+- `mysql`: 数据库 DSN
+- `redis`: 缓存配置
+- `minio`: 文件存储配置
+- `zhipuai`: 智谱 AI API 密钥
+- `admin`: 管理员 JWT 密钥和初始账号
+
+## 重要模式
+
+1. **依赖注入**: 所有依赖通过 `AppDeps` 注入，不在本地创建
+2. **中间件链**: RequestID → Logger → CORS → Auth (按需)
+3. **请求追踪**: 每个请求有唯一 RequestID，日志和响应都包含
+4. **软删除**: Model 表使用 GORM 软删除
+5. **会话归属**: 匿名会话可转换为认证用户会话
+6. **批量操作**: 批量 API 支持事务，失败返回部分结果
+
+## 当前实现状态
+
+- 聊天接口: 完整实现，支持智谱 AI 流式响应
+- 模型管理: 完整实现
+- 用户管理: 完整实现
+- 认证系统: 用户和管理员认证均已实现
+- 后台管理: 完整实现，包含批量操作
