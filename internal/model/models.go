@@ -26,14 +26,15 @@ type Message struct {
 }
 
 type User struct {
-	ID           string    `gorm:"type:varchar(36);primaryKey" json:"id"`
-	Name         string    `gorm:"type:varchar(64);not null" json:"name"`
-	Email        string    `gorm:"type:varchar(128);uniqueIndex;not null" json:"email"`
-	PasswordHash string    `gorm:"type:varchar(255);not null" json:"-"` // Hide from JSON
-	AvatarURL    string    `gorm:"type:varchar(512)" json:"avatar_url"`
-	Status       string    `gorm:"type:varchar(16);default:'active'" json:"status"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID               string    `gorm:"type:varchar(36);primaryKey" json:"id"`
+	Name             string    `gorm:"type:varchar(64);not null" json:"name"`
+	Email            string    `gorm:"type:varchar(128);uniqueIndex;not null" json:"email"`
+	PasswordHash     string    `gorm:"type:varchar(255);not null" json:"-"` // Hide from JSON
+	AvatarURL        string    `gorm:"type:varchar(512)" json:"avatar_url"`
+	Status           string    `gorm:"type:varchar(16);default:'active'" json:"status"`
+	DailyChatLimit   int       `gorm:"type:int;default:-1" json:"daily_chat_limit"` // -1表示无限制，0表示不允许请求，>0表示每日限制次数
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type Model struct {
@@ -54,6 +55,16 @@ type Attachment struct {
 	URL       string    `gorm:"type:varchar(1024);not null" json:"url"`
 	Type      string    `gorm:"type:varchar(16);index;not null" json:"type"` // image/video
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// UserDailyChatCount 用户每日对话次数统计
+type UserDailyChatCount struct {
+	ID        string    `gorm:"type:varchar(36);primaryKey" json:"id"`
+	UserID    string    `gorm:"type:varchar(36);index;not null" json:"user_id"`
+	Date      string    `gorm:"type:varchar(10);index;not null" json:"date"` // YYYY-MM-DD
+	Count     int       `gorm:"type:int;default:0" json:"count"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 

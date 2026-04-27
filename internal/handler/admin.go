@@ -3,7 +3,6 @@ package handler
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -112,7 +111,7 @@ func (a *AdminApp) adminGetUsers(c *gin.Context) {
 	// 构建查询
 	query := a.db.Model(&model.User{}).
 		Select(`
-			u.id, u.name, u.email, u.created_at, u.status,
+			u.id, u.name, u.email, u.created_at, u.status, u.daily_chat_limit,
 			(SELECT MAX(created_at) FROM messages WHERE user_id = u.id) as last_login_at,
 			(SELECT COUNT(*) FROM messages WHERE user_id = u.id) as message_count,
 			(SELECT COUNT(DISTINCT session_id) FROM messages WHERE user_id = u.id) as session_count
@@ -145,9 +144,9 @@ func (a *AdminApp) adminGetUsers(c *gin.Context) {
 	a.db.Model(&model.User{}).Count(&total)
 
 	response.NewResponseHelper(c).Success(gin.H{
-		"users": users,
-		"total": total,
-		"page":  page,
+		"users":     users,
+		"total":     total,
+		"page":      page,
 		"page_size": pageSize,
 	})
 }
@@ -176,6 +175,14 @@ func (a *AdminApp) adminCreateUser(c *gin.Context) {
 		PasswordHash: req.Password, // 简化处理，实际应该加密
 	}
 
+	// 设置 DailyChatLimit，如果请求中提供了则使用该值，否则使用默认值10
+	// 注意：0是有效值，表示每日请求次数为0
+	if req.DailyChatLimit != nil {
+		user.DailyChatLimit = *req.DailyChatLimit
+	} else {
+		user.DailyChatLimit = 10 // 默认设置为10次每日对话
+	}
+
 	if err := a.db.Create(&user).Error; err != nil {
 		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to create user")
 		return
@@ -202,7 +209,7 @@ func (a *AdminApp) adminUpdateUser(c *gin.Context) {
 		return
 	}
 
-	// 更新用户 - 只更新非零值字段
+	// 更新用户 - 只更新非空值字段
 	updates := make(map[string]interface{})
 	if req.Name != "" {
 		updates["name"] = req.Name
@@ -212,6 +219,12 @@ func (a *AdminApp) adminUpdateUser(c *gin.Context) {
 	}
 	if req.Password != "" {
 		updates["password_hash"] = req.Password // 简化处理，实际应该加密
+	}
+
+	// 处理 DailyChatLimit 字段
+	// DailyChatLimit 使用 *int 类型，nil 表示不设置/保持原值，有值表示设置为该值
+	if req.DailyChatLimit != nil {
+		updates["daily_chat_limit"] = *req.DailyChatLimit
 	}
 
 	if len(updates) == 0 {
@@ -387,9 +400,9 @@ func (a *AdminApp) adminGetModels(c *gin.Context) {
 	a.db.Model(&model.Model{}).Count(&total)
 
 	response.NewResponseHelper(c).Success(gin.H{
-		"models": models,
-		"total": total,
-		"page":  1,
+		"models":    models,
+		"total":     total,
+		"page":      1,
 		"page_size": 20,
 	})
 }
@@ -433,10 +446,10 @@ func (a *AdminApp) adminCreateModel(c *gin.Context) {
 
 	// 创建模型
 	modelData := model.Model{
-		ID:        generateID(),
-		Name:      req.Name,
-		ModelID:   req.ModelID,
-		Status:    req.Status,
+		ID:      generateID(),
+		Name:    req.Name,
+		ModelID: req.ModelID,
+		Status:  req.Status,
 	}
 
 	if req.Description != "" {
@@ -613,10 +626,10 @@ func (a *AdminApp) adminBatchDeleteModels(c *gin.Context) {
 
 	if len(failedDeletes) > 0 {
 		response.NewResponseHelper(c).Success(gin.H{
-			"message":        "partial deletion completed",
-			"success_count":  successCount,
-			"failed_ids":     failedDeletes,
-			"failed_reason":  "some models could not be deleted (either not found or have associated messages)",
+			"message":       "partial deletion completed",
+			"success_count": successCount,
+			"failed_ids":    failedDeletes,
+			"failed_reason": "some models could not be deleted (either not found or have associated messages)",
 		})
 	} else {
 		response.NewResponseHelper(c).Success(gin.H{
@@ -684,10 +697,10 @@ func (a *AdminApp) adminBatchActivateModels(c *gin.Context) {
 
 	if len(failedActivations) > 0 {
 		response.NewResponseHelper(c).Success(gin.H{
-			"message":         "partial activation completed",
-			"success_count":   successCount,
-			"failed_ids":      failedActivations,
-			"failed_reason":   "some models could not be activated (either not found or already active)",
+			"message":       "partial activation completed",
+			"success_count": successCount,
+			"failed_ids":    failedActivations,
+			"failed_reason": "some models could not be activated (either not found or already active)",
 		})
 	} else {
 		response.NewResponseHelper(c).Success(gin.H{
@@ -755,10 +768,10 @@ func (a *AdminApp) adminBatchDeactivateModels(c *gin.Context) {
 
 	if len(failedDeactivations) > 0 {
 		response.NewResponseHelper(c).Success(gin.H{
-			"message":           "partial deactivation completed",
-			"success_count":     successCount,
-			"failed_ids":        failedDeactivations,
-			"failed_reason":     "some models could not be deactivated (either not found or already inactive)",
+			"message":       "partial deactivation completed",
+			"success_count": successCount,
+			"failed_ids":    failedDeactivations,
+			"failed_reason": "some models could not be deactivated (either not found or already inactive)",
 		})
 	} else {
 		response.NewResponseHelper(c).Success(gin.H{
@@ -786,6 +799,7 @@ func (a *App) registerAdminRoutes() {
 
 		// 用户管理
 		adminGroup.GET("/users", adminApp.adminGetUsers)
+		adminGroup.GET("/users/:id", adminApp.adminGetUser)
 		adminGroup.POST("/users", adminApp.adminCreateUser)
 		adminGroup.PUT("/users/:id", adminApp.adminUpdateUser)
 		adminGroup.PATCH("/users/:id/status", adminApp.adminToggleUserStatus)
@@ -805,33 +819,6 @@ func (a *App) registerAdminRoutes() {
 		adminGroup.POST("/models/batch/activate", adminApp.adminBatchActivateModels)
 		adminGroup.POST("/models/batch/deactivate", adminApp.adminBatchDeactivateModels)
 	}
-
-	// Serve admin index page (public)
-	a.Engine.GET("/admin/login.html", func(c *gin.Context) {
-		c.File("./admin/login.html")
-	})
-
-	// Admin index page requires authentication
-	a.Engine.GET("/admin/index.html", func(c *gin.Context) {
-		// Check if user is authenticated
-		token := c.GetHeader("Authorization")
-		if token == "" {
-			// Not authenticated, redirect to login
-			c.Redirect(http.StatusFound, "/admin/login.html")
-			return
-		}
-
-		// Validate token
-		_, err := a.adminAuthService.ValidateToken(token)
-		if err != nil {
-			// Invalid token, redirect to login
-			c.Redirect(http.StatusFound, "/admin/login.html")
-			return
-		}
-
-		// Serve the admin page
-		c.File("./admin/index.html")
-	})
 }
 
 // generateID 生成ID
@@ -839,6 +826,19 @@ func generateID() string {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
 	return "admin_" + hex.EncodeToString(bytes)
+}
+
+// adminGetUser 获取单个用户详情
+func (a *AdminApp) adminGetUser(c *gin.Context) {
+	userID := c.Param("id")
+
+	var user model.User
+	if err := a.db.First(&user, "id = ?", userID).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "user not found")
+		return
+	}
+
+	response.NewResponseHelper(c).Success(user)
 }
 
 // generateUserID 生成用户ID

@@ -17,14 +17,15 @@ type Admin struct {
 
 // AdminUser 管理员视图用户数据
 type AdminUser struct {
-	ID            string    `json:"id" gorm:"primaryKey"`
-	Name          string    `json:"name"`
-	Email         string    `json:"email"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
-	LastLoginAt   *time.Time `json:"last_login_at"`
-	MessageCount  int64     `json:"message_count"`
-	SessionCount  int64     `json:"session_count"`
+	ID               string    `json:"id" gorm:"primaryKey"`
+	Name             string    `json:"name"`
+	Email            string    `json:"email"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	LastLoginAt      *time.Time `json:"last_login_at"`
+	MessageCount     int64     `json:"message_count"`
+	SessionCount     int64     `json:"session_count"`
+	DailyChatLimit   int       `json:"daily_chat_limit"`
 }
 
 // AdminModel 管理员视图模型数据
@@ -40,18 +41,20 @@ type AdminModel struct {
 
 // CreateAdminUserRequest 创建管理员用户请求
 type CreateAdminUserRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
-	Status   string `json:"status" binding:"oneof=active inactive"`
+	Name           string `json:"name" binding:"required"`
+	Email          string `json:"email" binding:"required,email"`
+	Password       string `json:"password" binding:"required,min=6"`
+	Status         string `json:"status" binding:"oneof=active inactive"`
+	DailyChatLimit *int   `json:"daily_chat_limit"` // 可选字段，nil表示使用默认值
 }
 
 // UpdateAdminUserRequest 更新管理员用户请求
 type UpdateAdminUserRequest struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Status   string `json:"status" binding:"oneof=active inactive"`
+	Name           string `json:"name"`
+	Email          string `json:"email"`
+	Password       string `json:"password"`
+	Status         string `json:"status" binding:"oneof=active inactive"`
+	DailyChatLimit *int   `json:"daily_chat_limit"`
 }
 
 // CreateAdminModelRequest 创建管理员模型请求

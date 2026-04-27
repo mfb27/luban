@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/mfb27/luban/internal/response"
 	"github.com/mfb27/luban/internal/zhipu"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type chatReq struct {
@@ -80,6 +82,14 @@ func (a *App) postChat(c *gin.Context) {
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		if claims, err := auth.ValidateToken(tokenString); err == nil {
 			userID = claims.UserID
+		}
+	}
+
+	// 检查用户对话次数限制（仅当用户已认证时）
+	if userID != "" {
+		if err := a.checkUserDailyChatLimit(userID, now); err != nil {
+			response.NewResponseHelper(c).Error(response.CodeForbidden, err.Error())
+			return
 		}
 	}
 
@@ -318,6 +328,65 @@ func (a *App) postChat(c *gin.Context) {
 			zap.String("session_id", sessionID),
 		)
 	}
+}
+
+// checkUserDailyChatLimit 检查用户每日对话次数限制
+func (a *App) checkUserDailyChatLimit(userID string, now time.Time) error {
+	// 获取用户信息
+	var user model.User
+	if err := a.db.First(&user, "id = ?", userID).Error; err != nil {
+		return fmt.Errorf("user not found")
+	}
+
+	// 如果用户的每日对话次数限制为-1，则表示无限制
+	if user.DailyChatLimit == -1 {
+		return nil
+	}
+
+	// 如果用户的每日对话次数限制为0，则表示不允许请求
+	if user.DailyChatLimit == 0 {
+		return fmt.Errorf("chat not allowed")
+	}
+
+	// 获取当前日期（格式：YYYY-MM-DD）
+	today := now.Format("2006-01-02")
+
+	// 查找今天的对话记录
+	var dailyCount model.UserDailyChatCount
+	err := a.db.Where("user_id = ? AND date = ?", userID, today).First(&dailyCount).Error
+	if err != nil {
+		// 如果找不到记录，说明今天还没有对话
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 创建新的记录
+			dailyCount = model.UserDailyChatCount{
+				ID:        uuid.NewString(),
+				UserID:    userID,
+				Date:      today,
+				Count:     0,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+			if err := a.db.Create(&dailyCount).Error; err != nil {
+				return fmt.Errorf("failed to create daily chat count record")
+			}
+		} else {
+			return fmt.Errorf("failed to check daily chat count")
+		}
+	}
+
+	// 检查是否超过限制
+	if dailyCount.Count >= user.DailyChatLimit {
+		return fmt.Errorf("daily chat limit exceeded. Limit: %d", user.DailyChatLimit)
+	}
+
+	// 增加对话计数
+	dailyCount.Count++
+	dailyCount.UpdatedAt = now
+	if err := a.db.Save(&dailyCount).Error; err != nil {
+		return fmt.Errorf("failed to update daily chat count")
+	}
+
+	return nil
 }
 
 func titleFromContent(s string) string {

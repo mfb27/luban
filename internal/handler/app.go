@@ -42,7 +42,7 @@ type AppDeps struct {
 }
 
 func NewApp(deps AppDeps) (*App, error) {
-	if err := deps.DB.AutoMigrate(&model.Session{}, &model.Message{}, &model.User{}, &model.Model{}, &model.Attachment{}, &model.Admin{}); err != nil {
+	if err := deps.DB.AutoMigrate(&model.Session{}, &model.Message{}, &model.User{}, &model.Model{}, &model.Attachment{}, &model.Admin{}, &model.UserDailyChatCount{}); err != nil {
 		return nil, err
 	}
 
