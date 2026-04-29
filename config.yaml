@@ -35,3 +35,12 @@ admin:
     name: Admin
     email: admin@example.com
     password: admin123
+
+github:
+  # GitHub OAuth configuration
+  # Create OAuth app at https://github.com/settings/developers
+  client_id: "Ov23liQGz3s8DiQzrK8o"
+  client_secret: "0bdf06d4e8f95842fecd94659e9eabbb5e9b5591"
+  # Redirect URI (should match GitHub OAuth app settings)
+  redirect_url: "http://localhost:8080/api/auth/github/callback"
+  # proxy_url: "http://127.0.0.1:7890"  # 添加你的代理地址 

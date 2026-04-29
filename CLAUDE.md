@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Luban 是一个基于 Go 语言开发的智能聊天应用，提供与智谱 AI (ZhipuAI) 模型对话的 Web 界面。应用采用 Gin 框架，使用 MySQL 进行数据持久化，Redis 缓存，MinIO 文件存储，并包含完整的后台管理系统。
 
+## 用户端页面目录
+D:\space\luban-frontend
+
+## 后台管理页面目录
+D:\space\luban-admin
+
 ## 常用命令
 
 ### 构建和运行

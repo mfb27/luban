@@ -6,7 +6,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
 type Session struct {
 	ID        string    `gorm:"type:varchar(36);primaryKey" json:"id"`
 	UserID    string    `gorm:"type:varchar(36);index;not null" json:"user_id"`
@@ -26,25 +25,26 @@ type Message struct {
 }
 
 type User struct {
-	ID               string    `gorm:"type:varchar(36);primaryKey" json:"id"`
-	Name             string    `gorm:"type:varchar(64);not null" json:"name"`
-	Email            string    `gorm:"type:varchar(128);uniqueIndex;not null" json:"email"`
-	PasswordHash     string    `gorm:"type:varchar(255);not null" json:"-"` // Hide from JSON
-	AvatarURL        string    `gorm:"type:varchar(512)" json:"avatar_url"`
-	Status           string    `gorm:"type:varchar(16);default:'active'" json:"status"`
-	DailyChatLimit   int       `gorm:"type:int;default:-1" json:"daily_chat_limit"` // -1表示无限制，0表示不允许请求，>0表示每日限制次数
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID             string    `gorm:"type:varchar(36);primaryKey" json:"id"`
+	Name           string    `gorm:"type:varchar(64);not null" json:"name"`
+	Email          string    `gorm:"type:varchar(128);uniqueIndex;not null" json:"email"`
+	PasswordHash   string    `gorm:"type:varchar(255)" json:"-"`            // Nullable for GitHub users
+	GithubID       string    `gorm:"type:varchar(64);uniqueIndex" json:"-"` // GitHub user ID, nullable
+	AvatarURL      string    `gorm:"type:varchar(512)" json:"avatar_url"`
+	Status         string    `gorm:"type:varchar(16);default:'active'" json:"status"`
+	DailyChatLimit int       `gorm:"type:int;default:-1" json:"daily_chat_limit"` // -1表示无限制，0表示不允许请求，>0表示每日限制次数
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type Model struct {
-	ID          string    `gorm:"type:varchar(64);primaryKey" json:"id"`
-	Name        string    `gorm:"type:varchar(128);not null" json:"name"`
-	ModelID     string    `gorm:"type:varchar(128);uniqueIndex" json:"model_id"`
-	Status      string    `gorm:"type:varchar(16);default:'active'" json:"status"`
-	Description string    `gorm:"type:text" json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string         `gorm:"type:varchar(64);primaryKey" json:"id"`
+	Name        string         `gorm:"type:varchar(128);not null" json:"name"`
+	ModelID     string         `gorm:"type:varchar(128);uniqueIndex" json:"model_id"`
+	Status      string         `gorm:"type:varchar(16);default:'active'" json:"status"`
+	Description string         `gorm:"type:text" json:"description"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"` // Soft delete support
 }
 
@@ -66,5 +66,3 @@ type UserDailyChatCount struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
-
-

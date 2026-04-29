@@ -15,6 +15,7 @@ type Config struct {
 	MinIO   MinIOConfig   `mapstructure:"minio"`
 	ZhipuAI ZhipuAIConfig `mapstructure:"zhipuai"`
 	Admin   AdminConfig   `mapstructure:"admin"`
+	GitHub  GitHubConfig  `mapstructure:"github"`
 }
 
 type ServerConfig struct {
@@ -59,6 +60,13 @@ type InitialAdminConfig struct {
 	Name     string `mapstructure:"name"`
 	Email    string `mapstructure:"email"`
 	Password string `mapstructure:"password"`
+}
+
+type GitHubConfig struct {
+	ClientID     string `mapstructure:"client_id"`
+	ClientSecret string `mapstructure:"client_secret"`
+	RedirectURL  string `mapstructure:"redirect_url"`
+	ProxyURL     string `mapstructure:"proxy_url"` // Optional: HTTP proxy for GitHub API (e.g., http://127.0.0.1:7890)
 }
 
 func Load() (*Config, error) {

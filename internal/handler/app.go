@@ -100,6 +100,11 @@ func (a *App) registerRoutes() {
 		api.POST("/auth/register", a.register)
 		api.POST("/auth/login", a.login)
 
+		// GitHub OAuth routes
+		api.GET("/auth/github", a.githubLoginURL)            // Get authorization URL
+		api.GET("/auth/github/callback", a.githubCallback)   // Handle OAuth callback (redirect flow)
+		api.POST("/auth/github/login", a.githubLoginDirect)  // Handle OAuth login (SPA flow with code)
+
 		// Public routes (no authentication required)
 		api.GET("/models", a.getModels)
 
