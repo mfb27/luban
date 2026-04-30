@@ -1,0 +1,50 @@
+# 服务器配置
+server:
+  host: 0.0.0.0  # 监听地址，0.0.0.0 表示监听所有网卡
+  port: 8080     # 服务端口
+
+# 日志配置
+log:
+  level: info    # 日志级别：debug, info, warn, error
+
+# MySQL 数据库配置
+mysql:
+  # 数据库连接字符串：用户名:密码@tcp(地址:端口)/数据库名?参数
+  # charset=utf8mb4: 支持 emoji 和特殊字符
+  # parseTime=True: 自动解析时间类型
+  # loc=Local: 使用本地时区
+  dsn: root:123123@tcp(127.0.0.1:3306)/luban?charset=utf8mb4&parseTime=True&loc=Local
+
+# Redis 缓存配置
+redis:
+  addr: 127.0.0.1:6379  # Redis 服务地址
+  password: ""          # Redis 密码，无密码则为空
+  db: 0                 # 使用的数据库编号 (0-15)
+
+# MinIO 对象存储配置
+minio:
+  endpoint: 127.0.0.1:9000           # MinIO 服务地址
+  access_key_id: minioadmin          # 访问密钥 ID
+  secret_access_key: minioadmin      # 访问密钥
+  bucket: luban                      # 存储桶名称
+  use_ssl: false                     # 是否使用 SSL 连接
+  public_base_url: http://127.0.0.1:9000  # 公网访问地址，用于生成文件访问 URL
+
+# 智谱 AI 配置
+zhipuai:
+  api_key:   # 智谱 AI API 密钥
+  api_url: https://api.zhipuai.com/v1/chat/completions      # 智谱 AI API 地址
+
+# 后台管理系统配置
+admin:
+  secret_key: your-secret-key-change-this-in-production  # JWT 签名密钥，生产环境请修改
+  initial_admin:                        # 初始管理员账号（首次启动时自动创建）
+    name: Admin                          # 管理员用户名
+    email: admin@example.com            # 管理员邮箱
+    password: admin123                  # 管理员密码，生产环境请修改
+
+# GitHub OAuth 登录配置
+github:
+  client_id: ""              # GitHub OAuth App 的 Client ID
+  client_secret: ""  # GitHub OAuth App 的 Client Secret
+  redirect_url: ""  # OAuth 回调地址，需与 GitHub OAuth App 设置一致

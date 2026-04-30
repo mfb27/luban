@@ -29,7 +29,10 @@ go.work.sum
 
 # Editor/IDE
 # .idea/
-# .vscode/
+.vscode/
+.claude/
 .worktrees
 
 settings.local.json
+docs/
+config.default.yaml
