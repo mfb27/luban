@@ -95,7 +95,21 @@ func (r *ResponseHelper) Error(code ResponseCode, message string) {
 		RequestID: middleware.GetRequestID(r.c),
 	}
 
-	r.c.JSON(http.StatusOK, response)
+	httpStatus := http.StatusOK
+	switch {
+	case code >= 10000000 && code < 20000000:
+		httpStatus = http.StatusBadRequest
+	case code >= 20000000 && code < 30000000:
+		httpStatus = http.StatusInternalServerError
+	case code >= 30000000 && code < 40000000:
+		httpStatus = http.StatusUnauthorized
+	case code >= 40000000 && code < 50000000:
+		httpStatus = http.StatusForbidden
+	case code >= 50000000:
+		httpStatus = http.StatusBadRequest
+	}
+
+	r.c.JSON(httpStatus, response)
 }
 
 // SuccessWithMessage 带消息的成功响应
@@ -118,7 +132,21 @@ func (r *ResponseHelper) ErrorWithDetails(code ResponseCode, message string, det
 		RequestID: middleware.GetRequestID(r.c),
 	}
 
-	r.c.JSON(http.StatusOK, response)
+	httpStatus := http.StatusOK
+	switch {
+	case code >= 10000000 && code < 20000000:
+		httpStatus = http.StatusBadRequest
+	case code >= 20000000 && code < 30000000:
+		httpStatus = http.StatusInternalServerError
+	case code >= 30000000 && code < 40000000:
+		httpStatus = http.StatusUnauthorized
+	case code >= 40000000 && code < 50000000:
+		httpStatus = http.StatusForbidden
+	case code >= 50000000:
+		httpStatus = http.StatusBadRequest
+	}
+
+	r.c.JSON(httpStatus, response)
 }
 
 // PageResponse 分页响应结构

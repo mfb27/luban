@@ -8,14 +8,13 @@ import (
 )
 
 type Config struct {
-	Server  ServerConfig  `mapstructure:"server"`
-	Log     LogConfig     `mapstructure:"log"`
-	MySQL   MySQLConfig   `mapstructure:"mysql"`
-	Redis   RedisConfig   `mapstructure:"redis"`
-	MinIO   MinIOConfig   `mapstructure:"minio"`
-	ZhipuAI ZhipuAIConfig `mapstructure:"zhipuai"`
-	Admin   AdminConfig   `mapstructure:"admin"`
-	GitHub  GitHubConfig  `mapstructure:"github"`
+	Server ServerConfig `mapstructure:"server"`
+	Log    LogConfig    `mapstructure:"log"`
+	MySQL  MySQLConfig  `mapstructure:"mysql"`
+	Redis  RedisConfig  `mapstructure:"redis"`
+	MinIO  MinIOConfig  `mapstructure:"minio"`
+	Admin  AdminConfig  `mapstructure:"admin"`
+	GitHub GitHubConfig `mapstructure:"github"`
 }
 
 type ServerConfig struct {
@@ -44,11 +43,6 @@ type MinIOConfig struct {
 	Bucket          string `mapstructure:"bucket"`
 	UseSSL          bool   `mapstructure:"use_ssl"`
 	PublicBaseURL   string `mapstructure:"public_base_url"`
-}
-
-type ZhipuAIConfig struct {
-	APIKey  string `mapstructure:"api_key"`
-	BaseURL string `mapstructure:"base_url"`
 }
 
 type AdminConfig struct {
@@ -104,10 +98,6 @@ func Load() (*Config, error) {
 			scheme = "https"
 		}
 		cfg.MinIO.PublicBaseURL = fmt.Sprintf("%s://%s", scheme, cfg.MinIO.Endpoint)
-	}
-
-	if cfg.ZhipuAI.APIKey == "" {
-		return nil, fmt.Errorf("zhipuai.api_key is required (or set LUBAN_ZHIPUAI_API_KEY)")
 	}
 
 	return &cfg, nil

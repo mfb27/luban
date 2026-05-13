@@ -384,7 +384,7 @@ func (a *AdminApp) adminGetModels(c *gin.Context) {
 
 	// 先获取基础模型数据
 	if err := a.db.Model(&model.Model{}).
-		Select("id, name, model_id, status, description, created_at").
+		Select("id, name, model_id, provider_id, status, description, created_at").
 		Find(&models).Error; err != nil {
 		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to load models")
 		return
@@ -413,7 +413,7 @@ func (a *AdminApp) getModelsData() ([]model.AdminModel, error) {
 
 	// 尝试直接查询
 	err := a.db.Model(&model.Model{}).
-		Select("id, name, model_id, status, description, created_at").
+		Select("id, name, model_id, provider_type, status, description, created_at").
 		Find(&models).Error
 
 	if err != nil {
@@ -444,12 +444,20 @@ func (a *AdminApp) adminCreateModel(c *gin.Context) {
 		return
 	}
 
+	// 检查提供商是否存在且活跃
+	var provider model.APIProvider
+	if err := a.db.Where("id = ? AND status = ?", req.ProviderID, "active").First(&provider).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "provider not found or inactive")
+		return
+	}
+
 	// 创建模型
 	modelData := model.Model{
-		ID:      generateID(),
-		Name:    req.Name,
-		ModelID: req.ModelID,
-		Status:  req.Status,
+		ID:         generateID(),
+		Name:       req.Name,
+		ModelID:    req.ModelID,
+		ProviderID: req.ProviderID,
+		Status:     req.Status,
 	}
 
 	if req.Description != "" {
@@ -489,6 +497,15 @@ func (a *AdminApp) adminUpdateModel(c *gin.Context) {
 	}
 	if req.ModelID != "" {
 		updates["model_id"] = req.ModelID
+	}
+	if req.ProviderID != "" {
+		// 检查提供商是否存在且活跃
+		var provider model.APIProvider
+		if err := a.db.Where("id = ? AND status = ?", req.ProviderID, "active").First(&provider).Error; err != nil {
+			response.NewResponseHelper(c).Error(response.CodeInvalidParam, "provider not found or inactive")
+			return
+		}
+		updates["provider_id"] = req.ProviderID
 	}
 	if req.Status != "" {
 		updates["status"] = req.Status
@@ -818,6 +835,16 @@ func (a *App) registerAdminRoutes() {
 		adminGroup.POST("/models/batch/delete", adminApp.adminBatchDeleteModels)
 		adminGroup.POST("/models/batch/activate", adminApp.adminBatchActivateModels)
 		adminGroup.POST("/models/batch/deactivate", adminApp.adminBatchDeactivateModels)
+
+		// API 提供商管理
+		adminGroup.GET("/api-providers", adminApp.adminGetAPIProviders)
+		adminGroup.GET("/api-providers/:id", adminApp.adminGetAPIProvider)
+		adminGroup.POST("/api-providers", adminApp.adminCreateAPIProvider)
+		adminGroup.PUT("/api-providers/:id", adminApp.adminUpdateAPIProvider)
+		adminGroup.PATCH("/api-providers/:id/status", adminApp.adminToggleAPIProviderStatus)
+		adminGroup.DELETE("/api-providers/:id", adminApp.adminDeleteAPIProvider)
+		adminGroup.PUT("/api-providers/batch/status", adminApp.adminBatchUpdateAPIProviderStatus)
+		adminGroup.DELETE("/api-providers/batch", adminApp.adminBatchDeleteAPIProviders)
 	}
 }
 
@@ -844,4 +871,306 @@ func (a *AdminApp) adminGetUser(c *gin.Context) {
 // generateUserID 生成用户ID
 func generateUserID() string {
 	return uuid.New().String()
+}
+
+// ============ API 提供商管理 ============
+
+// adminGetAPIProviders 获取API提供商列表
+func (a *AdminApp) adminGetAPIProviders(c *gin.Context) {
+	var providers []model.AdminAPIProvider
+
+	// 构建查询
+	query := a.db.Model(&model.APIProvider{}).
+		Select("id, name, provider_type, api_key, base_url, anthropic_base_url, status, description, priority, created_at")
+
+	// 状态过滤
+	if status := c.Query("status"); status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := query.Order("priority ASC, created_at DESC").Scan(&providers).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to load providers")
+		return
+	}
+
+	// 确保即使没有数据也返回空数组而不是null
+	if providers == nil {
+		providers = []model.AdminAPIProvider{}
+	}
+
+	// 获取总数
+	var total int64
+	a.db.Model(&model.APIProvider{}).Count(&total)
+
+	response.NewResponseHelper(c).Success(gin.H{
+		"providers": providers,
+		"total":     total,
+	})
+}
+
+// adminGetAPIProvider 获取单个API提供商详情
+func (a *AdminApp) adminGetAPIProvider(c *gin.Context) {
+	providerID := c.Param("id")
+
+	var provider model.APIProvider
+	if err := a.db.First(&provider, "id = ?", providerID).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "provider not found")
+		return
+	}
+
+	response.NewResponseHelper(c).Success(provider)
+}
+
+// adminCreateAPIProvider 创建API提供商
+func (a *AdminApp) adminCreateAPIProvider(c *gin.Context) {
+	var req model.CreateAPIProviderRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
+		return
+	}
+
+	// 创建提供商
+	provider := model.APIProvider{
+		ID:               generateProviderID(),
+		Name:             req.Name,
+		ProviderType:     req.ProviderType,
+		APIKey:           req.APIKey,
+		BaseURL:          req.BaseURL,
+		AnthropicBaseURL: req.AnthropicBaseURL,
+		Status:           req.Status,
+		Description:      req.Description,
+		Priority:         req.Priority,
+	}
+
+	if err := a.db.Create(&provider).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to create provider")
+		return
+	}
+
+	response.NewResponseHelper(c).Success(provider)
+}
+
+// adminUpdateAPIProvider 更新API提供商
+func (a *AdminApp) adminUpdateAPIProvider(c *gin.Context) {
+	providerID := c.Param("id")
+
+	var req model.UpdateAPIProviderRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
+		return
+	}
+
+	// 检查提供商是否存在
+	var provider model.APIProvider
+	if err := a.db.First(&provider, "id = ?", providerID).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "provider not found")
+		return
+	}
+
+	// 更新提供商 - 只更新非空值字段
+	updates := make(map[string]interface{})
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.APIKey != "" {
+		updates["api_key"] = req.APIKey
+	}
+	if req.ProviderType != "" {
+		updates["provider_type"] = req.ProviderType
+	}
+	if req.BaseURL != "" {
+		updates["base_url"] = req.BaseURL
+	}
+	if req.AnthropicBaseURL != "" {
+		updates["anthropic_base_url"] = req.AnthropicBaseURL
+	}
+	if req.Status != "" {
+		updates["status"] = req.Status
+	}
+	updates["description"] = req.Description
+	updates["priority"] = req.Priority
+
+	if len(updates) == 0 {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "no fields to update")
+		return
+	}
+
+	if err := a.db.Model(&provider).Updates(updates).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to update provider")
+		return
+	}
+
+	// 重新获取更新后的提供商数据
+	a.db.First(&provider, "id = ?", providerID)
+
+	response.NewResponseHelper(c).Success(provider)
+}
+
+// adminToggleAPIProviderStatus 切换API提供商状态
+func (a *AdminApp) adminToggleAPIProviderStatus(c *gin.Context) {
+	providerID := c.Param("id")
+	var req struct {
+		Status string `json:"status" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "invalid request")
+		return
+	}
+
+	// 检查提供商是否存在
+	var provider model.APIProvider
+	if err := a.db.First(&provider, "id = ?", providerID).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "provider not found")
+		return
+	}
+
+	if err := a.db.Model(&provider).Update("status", req.Status).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to update provider status")
+		return
+	}
+
+	response.NewResponseHelper(c).Success(gin.H{"status": req.Status})
+}
+
+// adminDeleteAPIProvider 删除API提供商
+func (a *AdminApp) adminDeleteAPIProvider(c *gin.Context) {
+	providerID := c.Param("id")
+
+	// 检查提供商是否存在
+	var provider model.APIProvider
+	if err := a.db.First(&provider, "id = ?", providerID).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "provider not found")
+		return
+	}
+
+	// 删除提供商
+	if err := a.db.Delete(&provider).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to delete provider")
+		return
+	}
+
+	response.NewResponseHelper(c).Success(gin.H{"message": "provider deleted successfully"})
+}
+
+// adminBatchUpdateAPIProviderStatus 批量更新API提供商状态
+func (a *AdminApp) adminBatchUpdateAPIProviderStatus(c *gin.Context) {
+	var req model.BatchAPIProviderStatusRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, err.Error())
+		return
+	}
+
+	// 去重提供商ID
+	uniqueProviderIDs := make(map[string]bool)
+	for _, id := range req.ProviderIDs {
+		uniqueProviderIDs[id] = true
+	}
+	req.ProviderIDs = make([]string, 0, len(uniqueProviderIDs))
+	for id := range uniqueProviderIDs {
+		req.ProviderIDs = append(req.ProviderIDs, id)
+	}
+
+	// 验证所有提供商存在
+	var count int64
+	if err := a.db.Model(&model.APIProvider{}).Where("id IN ?", req.ProviderIDs).Count(&count).Error; err != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to verify providers")
+		return
+	}
+	if int(count) != len(req.ProviderIDs) {
+		response.NewResponseHelper(c).Error(response.CodeNotFound, "one or more providers not found")
+		return
+	}
+
+	// 批量更新
+	result := a.db.Model(&model.APIProvider{}).
+		Where("id IN ?", req.ProviderIDs).
+		Update("status", req.Status)
+
+	if result.Error != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to update provider status")
+		return
+	}
+
+	response.NewResponseHelper(c).Success(gin.H{
+		"updated_count": result.RowsAffected,
+	})
+}
+
+// adminBatchDeleteAPIProviders 批量删除API提供商
+func (a *AdminApp) adminBatchDeleteAPIProviders(c *gin.Context) {
+	var req model.BatchDeleteAPIProviderRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, err.Error())
+		return
+	}
+
+	// 去重提供商ID
+	uniqueProviderIDs := make(map[string]bool)
+	for _, id := range req.ProviderIDs {
+		uniqueProviderIDs[id] = true
+	}
+	req.ProviderIDs = make([]string, 0, len(uniqueProviderIDs))
+	for id := range uniqueProviderIDs {
+		req.ProviderIDs = append(req.ProviderIDs, id)
+	}
+
+	// 开始事务
+	tx := a.db.Begin()
+	if tx.Error != nil {
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to start transaction")
+		return
+	}
+
+	var failedDeletes []string
+	var successCount int
+
+	for _, providerID := range req.ProviderIDs {
+		// 检查提供商是否存在
+		var provider model.APIProvider
+		if err := tx.First(&provider, "id = ?", providerID).Error; err != nil {
+			failedDeletes = append(failedDeletes, providerID)
+			continue
+		}
+
+		// 删除提供商
+		if err := tx.Delete(&provider).Error; err != nil {
+			failedDeletes = append(failedDeletes, providerID)
+			continue
+		}
+
+		successCount++
+	}
+
+	// 提交事务
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, "failed to commit transaction")
+		return
+	}
+
+	if len(failedDeletes) > 0 {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":       "partial deletion completed",
+			"success_count": successCount,
+			"failed_ids":    failedDeletes,
+			"failed_reason": "some providers could not be deleted (either not found or have associated models)",
+		})
+	} else {
+		response.NewResponseHelper(c).Success(gin.H{
+			"message":       "all providers deleted successfully",
+			"deleted_count": successCount,
+		})
+	}
+}
+
+// generateProviderID 生成提供商ID (已在 app.go 中定义，这里使用不同的名称避免冲突)
+func generateProviderAdminID() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return "provider_" + hex.EncodeToString(bytes)
 }

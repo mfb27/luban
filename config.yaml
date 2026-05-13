@@ -30,11 +30,6 @@ minio:
   use_ssl: false                     # 是否使用 SSL 连接
   public_base_url: http://127.0.0.1:9000  # 公网访问地址，用于生成文件访问 URL
 
-# 智谱 AI 配置
-zhipuai:
-  api_key:   # 智谱 AI API 密钥
-  api_url: https://api.zhipuai.com/v1/chat/completions      # 智谱 AI API 地址
-
 # 后台管理系统配置
 admin:
   secret_key: your-secret-key-change-this-in-production  # JWT 签名密钥，生产环境请修改

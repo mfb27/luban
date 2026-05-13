@@ -11,7 +11,6 @@ import (
 	"github.com/mfb27/luban/internal/model"
 	"github.com/mfb27/luban/internal/response"
 	"github.com/mfb27/luban/internal/storage"
-	"github.com/mfb27/luban/internal/zhipu"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
@@ -27,7 +26,6 @@ type App struct {
 	db    *gorm.DB
 	redis *redis.Client
 	minio *storage.MinIO
-	zhipu *zhipu.Client
 
 	minioBucket     string
 	minioPublicBase string
@@ -42,7 +40,7 @@ type AppDeps struct {
 }
 
 func NewApp(deps AppDeps) (*App, error) {
-	if err := deps.DB.AutoMigrate(&model.Session{}, &model.Message{}, &model.User{}, &model.Model{}, &model.Attachment{}, &model.Admin{}, &model.UserDailyChatCount{}); err != nil {
+	if err := deps.DB.AutoMigrate(&model.Session{}, &model.Message{}, &model.User{}, &model.Model{}, &model.Attachment{}, &model.Admin{}, &model.UserDailyChatCount{}, &model.APIProvider{}); err != nil {
 		return nil, err
 	}
 
@@ -59,12 +57,6 @@ func NewApp(deps AppDeps) (*App, error) {
 	// Use simple CORS middleware for development
 	engine.Use(middleware.SimpleCORSMiddleware())
 
-	// Create ZhipuAI client
-	zhipuClient := zhipu.NewClient(&zhipu.Config{
-		APIKey:  deps.Cfg.ZhipuAI.APIKey,
-		BaseURL: deps.Cfg.ZhipuAI.BaseURL,
-	})
-
 	// Create admin auth service
 	adminAuthService := admin.NewAdminAuthService(deps.DB, deps.Cfg.Admin.SecretKey)
 
@@ -76,15 +68,22 @@ func NewApp(deps AppDeps) (*App, error) {
 		db:               deps.DB,
 		redis:            deps.Redis,
 		minio:            deps.MinIO,
-		zhipu:            zhipuClient,
 		minioBucket:      deps.MinIO.Bucket,
 		minioPublicBase:  deps.MinIO.PublicBaseURL,
 	}
 
 	app.registerRoutes()
 	app.seedAdminIfNeeded()
+	app.registerOpenAICompatRoutes()
 
 	return app, nil
+}
+
+// generateProviderID 生成提供商ID
+func generateProviderID() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return "provider_" + hex.EncodeToString(bytes)
 }
 
 func (a *App) registerRoutes() {

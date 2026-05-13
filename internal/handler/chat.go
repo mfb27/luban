@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,8 +14,9 @@ import (
 	"github.com/mfb27/luban/internal/auth"
 	"github.com/mfb27/luban/internal/middleware"
 	"github.com/mfb27/luban/internal/model"
+	"github.com/mfb27/luban/internal/provider"
+	"github.com/mfb27/luban/internal/providerfactory"
 	"github.com/mfb27/luban/internal/response"
-	"github.com/mfb27/luban/internal/zhipu"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -91,6 +93,43 @@ func (a *App) postChat(c *gin.Context) {
 			response.NewResponseHelper(c).Error(response.CodeForbidden, err.Error())
 			return
 		}
+	}
+
+	// Get model info to determine provider
+	var modelInfo model.Model
+	if err := a.db.Where("model_id = ? AND status = ?", req.ModelID, "active").First(&modelInfo).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.NewResponseHelper(c).Error(response.CodeNotFound, "model not found or inactive")
+			return
+		}
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, err.Error())
+		return
+	}
+
+	// Get provider configuration by provider_id
+	var providerConfig model.APIProvider
+	if err := a.db.Where("id = ? AND status = ?", modelInfo.ProviderID, "active").First(&providerConfig).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.NewResponseHelper(c).Error(response.CodeNotFound, "provider not found or inactive")
+			return
+		}
+		response.NewResponseHelper(c).Error(response.CodeDatabaseError, err.Error())
+		return
+	}
+
+	if providerConfig.GetBaseURL() == "" {
+		response.NewResponseHelper(c).Error(response.CodeInvalidParam, "provider has no base URL configured")
+		return
+	}
+
+	// Create provider client
+	prov, err := providerfactory.NewProvider(providerConfig.ProviderType, &providerfactory.ProviderConfig{
+		APIKey:  providerConfig.APIKey,
+		BaseURL: providerConfig.GetBaseURL(),
+	})
+	if err != nil {
+		response.NewResponseHelper(c).Error(response.CodeInternal, fmt.Sprintf("failed to create provider: %v", err))
+		return
 	}
 
 	// Ensure session exists.
@@ -200,15 +239,15 @@ func (a *App) postChat(c *gin.Context) {
 	}
 
 	// Build messages for API request
-	messages := []zhipu.Message{}
+	messages := []provider.Message{}
 	for _, msg := range historyMessages {
-		messages = append(messages, zhipu.Message{
+		messages = append(messages, provider.Message{
 			Role:    msg.Role,
 			Content: msg.Content,
 		})
 	}
 	// Add current user message
-	messages = append(messages, zhipu.Message{
+	messages = append(messages, provider.Message{
 		Role:    "user",
 		Content: req.Content,
 	})
@@ -248,8 +287,8 @@ func (a *App) postChat(c *gin.Context) {
 
 	// Send initial session info
 	sessionEvent := map[string]interface{}{
-		"type":       sseEventTypeSession,
-		"session_id": sessionID,
+		"type":        sseEventTypeSession,
+		"session_id":  sessionID,
 		"user_msg_id": userMsg.ID,
 	}
 	sessionJson, _ := json.Marshal(sessionEvent)
@@ -260,12 +299,8 @@ func (a *App) postChat(c *gin.Context) {
 	asstMsgID := uuid.NewString()
 	var fullContent strings.Builder
 
-	// Call ZhipuAI streaming API
-	err := a.zhipu.ChatStream(&zhipu.ChatRequest{
-		Model:    req.ModelID,
-		Messages: messages,
-		Stream:   true,
-	}, func(chunk *zhipu.StreamChunk) error {
+	// Call provider streaming API
+	err = prov.ChatStream(context.Background(), req.ModelID, messages, func(chunk *provider.StreamChunk) error {
 		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta != nil {
 			delta := chunk.Choices[0].Delta
 			if delta.Content != "" {
@@ -279,7 +314,7 @@ func (a *App) postChat(c *gin.Context) {
 
 	if err != nil {
 		if reqLog != nil {
-			reqLog.Error("zhipuai streaming api call failed",
+			reqLog.Error("provider streaming api call failed",
 				middleware.GetRequestIDField(c),
 				middleware.GetErrorField(err),
 			)
@@ -313,9 +348,9 @@ func (a *App) postChat(c *gin.Context) {
 
 	// Send done event with assistant message ID and new conversation flag
 	doneEvent := map[string]interface{}{
-		"type":             sseEventTypeDone,
-		"assistant_id":     asstMsgID,
-		"session_id":       sessionID,
+		"type":               sseEventTypeDone,
+		"assistant_id":       asstMsgID,
+		"session_id":         sessionID,
 		"is_new_conversation": isNewConversation,
 	}
 	doneJson, _ := json.Marshal(doneEvent)

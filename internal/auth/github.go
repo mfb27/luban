@@ -204,7 +204,7 @@ func HandleGitHubLogin(db *gorm.DB, cfg *GitHubOAuthConfig, code string) (*Login
 			err = db.Where("email = ?", strings.ToLower(githubUser.Email)).First(&user).Error
 			if err == nil {
 				// User exists with same email - link GitHub account
-				user.GithubID = githubIDStr
+				user.GithubID = &githubIDStr
 				user.AvatarURL = githubUser.AvatarURL
 				if user.Name == "" {
 					user.Name = displayName
@@ -219,7 +219,7 @@ func HandleGitHubLogin(db *gorm.DB, cfg *GitHubOAuthConfig, code string) (*Login
 					ID:        uuid.New().String(),
 					Name:      displayName,
 					Email:     strings.ToLower(githubUser.Email),
-					GithubID:  githubIDStr,
+					GithubID:  &githubIDStr,
 					AvatarURL: githubUser.AvatarURL,
 					Status:    "active",
 					CreatedAt: time.Now(),
@@ -235,7 +235,7 @@ func HandleGitHubLogin(db *gorm.DB, cfg *GitHubOAuthConfig, code string) (*Login
 				ID:        uuid.New().String(),
 				Name:      displayName,
 				Email:     strings.ToLower(githubUser.Login) + "@github.com",
-				GithubID:  githubIDStr,
+				GithubID:  &githubIDStr,
 				AvatarURL: githubUser.AvatarURL,
 				Status:    "active",
 				CreatedAt: time.Now(),

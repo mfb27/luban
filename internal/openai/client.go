@@ -1,12 +1,9 @@
-package zhipu
+package openai
 
 import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,21 +15,32 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+	defaultBaseURL = "https://api.openai.com/v1/chat/completions"
 )
 
-// Client represents a ZhipuAI API client
+// Client represents an OpenAI API client
 type Client struct {
 	apiKey     string
 	baseURL    string
 	httpClient *http.Client
 }
 
-// NewClient creates a new ZhipuAI client
+// NewClient creates a new OpenAI client
 func NewClient(apiKey, baseURL string) *Client {
 	url := defaultBaseURL
 	if baseURL != "" {
-		url = baseURL
+		// Ensure the URL ends with /chat/completions
+		if !strings.HasSuffix(baseURL, "/chat/completions") {
+			if strings.HasSuffix(baseURL, "/v1") {
+				url = baseURL + "/chat/completions"
+			} else if strings.HasSuffix(baseURL, "/") {
+				url = baseURL + "v1/chat/completions"
+			} else {
+				url = baseURL + "/v1/chat/completions"
+			}
+		} else {
+			url = baseURL
+		}
 	}
 	return &Client{
 		apiKey:     apiKey,
@@ -43,97 +51,48 @@ func NewClient(apiKey, baseURL string) *Client {
 
 // Name returns the provider name
 func (c *Client) Name() string {
-	return "zhipu"
+	return "openai"
 }
 
-// zhipuRequest represents ZhipuAI API request format
-type zhipuRequest struct {
+// openAIRequest represents OpenAI API request format
+type openAIRequest struct {
 	Model    string            `json:"model"`
 	Messages []provider.Message `json:"messages"`
 	Stream   bool              `json:"stream"`
 }
 
-// zhipuResponse represents ZhipuAI API response format
-type zhipuResponse struct {
+// openAIResponse represents OpenAI API response format
+type openAIResponse struct {
 	ID      string              `json:"id"`
+	Object  string              `json:"object"`
 	Created int64               `json:"created"`
 	Model   string              `json:"model"`
-	Choices []zhipuChoice       `json:"choices"`
+	Choices []openAIChoice      `json:"choices"`
 	Usage   provider.ChatUsage  `json:"usage,omitempty"`
 	Error   *provider.ErrorResp `json:"error,omitempty"`
 }
 
-// zhipuChoice represents a choice in ZhipuAI response
-type zhipuChoice struct {
+// openAIChoice represents a choice in OpenAI response
+type openAIChoice struct {
 	Index        int               `json:"index"`
 	Message      *provider.Message `json:"message,omitempty"`
 	Delta        *provider.Message `json:"delta,omitempty"`
 	FinishReason string            `json:"finish_reason"`
 }
 
-// zhipuStreamChunk represents ZhipuAI streaming chunk format
-type zhipuStreamChunk struct {
+// openAIStreamChunk represents OpenAI streaming chunk format
+type openAIStreamChunk struct {
 	ID      string              `json:"id"`
+	Object  string              `json:"object"`
 	Created int64               `json:"created"`
 	Model   string              `json:"model"`
-	Choices []zhipuChoice       `json:"choices"`
+	Choices []openAIChoice      `json:"choices"`
 	Error   *provider.ErrorResp `json:"error,omitempty"`
-}
-
-// generateToken creates a JWT token for API authentication
-// Following ZhipuAI's token generation specification
-func generateToken(apiKey string) (string, error) {
-	parts := bytes.Split([]byte(apiKey), []byte("."))
-	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid api key format")
-	}
-
-	id := string(parts[0])
-	secret := string(parts[1])
-
-	now := time.Now()
-	exp := now.Add(1 * time.Hour)
-
-	// Header
-	header := map[string]interface{}{
-		"alg":       "HS256",
-		"sign_type": "SIGN",
-	}
-
-	// Payload
-	payload := map[string]interface{}{
-		"api_key":   id,
-		"exp":       exp.Unix(),
-		"timestamp": now.Unix(),
-	}
-
-	// Encode header
-	headerJSON, _ := json.Marshal(header)
-	headerB64 := base64.RawURLEncoding.EncodeToString(headerJSON)
-
-	// Encode payload
-	payloadJSON, _ := json.Marshal(payload)
-	payloadB64 := base64.RawURLEncoding.EncodeToString(payloadJSON)
-
-	// Create signature
-	signingInput := headerB64 + "." + payloadB64
-	h := hmac.New(sha256.New, []byte(secret))
-	h.Write([]byte(signingInput))
-	signature := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
-
-	// Combine to form JWT
-	token := signingInput + "." + signature
-	return token, nil
 }
 
 // Chat sends a non-streaming chat completion request
 func (c *Client) Chat(ctx context.Context, model string, messages []provider.Message) (*provider.ChatResponse, error) {
-	token, err := generateToken(c.apiKey)
-	if err != nil {
-		return nil, fmt.Errorf("generate token: %w", err)
-	}
-
-	body, err := json.Marshal(&zhipuRequest{
+	body, err := json.Marshal(&openAIRequest{
 		Model:    model,
 		Messages: messages,
 		Stream:   false,
@@ -148,7 +107,7 @@ func (c *Client) Chat(ctx context.Context, model string, messages []provider.Mes
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -165,18 +124,18 @@ func (c *Client) Chat(ctx context.Context, model string, messages []provider.Mes
 		return nil, fmt.Errorf("api error (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
-	var zhipuResp zhipuResponse
-	if err := json.Unmarshal(respBody, &zhipuResp); err != nil {
+	var openAIResp openAIResponse
+	if err := json.Unmarshal(respBody, &openAIResp); err != nil {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	if zhipuResp.Error != nil {
-		return nil, fmt.Errorf("api error: %s", zhipuResp.Error.Message)
+	if openAIResp.Error != nil {
+		return nil, fmt.Errorf("api error: %s", openAIResp.Error.Message)
 	}
 
 	// Convert to provider response
-	choices := make([]provider.ChatChoice, len(zhipuResp.Choices))
-	for i, ch := range zhipuResp.Choices {
+	choices := make([]provider.ChatChoice, len(openAIResp.Choices))
+	for i, ch := range openAIResp.Choices {
 		choices[i] = provider.ChatChoice{
 			Index:        ch.Index,
 			Message:      ch.Message,
@@ -185,22 +144,17 @@ func (c *Client) Chat(ctx context.Context, model string, messages []provider.Mes
 	}
 
 	return &provider.ChatResponse{
-		ID:      zhipuResp.ID,
-		Created: zhipuResp.Created,
-		Model:   zhipuResp.Model,
+		ID:      openAIResp.ID,
+		Created: openAIResp.Created,
+		Model:   openAIResp.Model,
 		Choices: choices,
-		Usage:   zhipuResp.Usage,
+		Usage:   openAIResp.Usage,
 	}, nil
 }
 
 // ChatStream sends a streaming chat completion request
 func (c *Client) ChatStream(ctx context.Context, model string, messages []provider.Message, callback provider.StreamCallback) error {
-	token, err := generateToken(c.apiKey)
-	if err != nil {
-		return fmt.Errorf("generate token: %w", err)
-	}
-
-	body, err := json.Marshal(&zhipuRequest{
+	body, err := json.Marshal(&openAIRequest{
 		Model:    model,
 		Messages: messages,
 		Stream:   true,
@@ -215,7 +169,7 @@ func (c *Client) ChatStream(ctx context.Context, model string, messages []provid
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -248,7 +202,7 @@ func (c *Client) ChatStream(ctx context.Context, model string, messages []provid
 			break
 		}
 
-		var chunk zhipuStreamChunk
+		var chunk openAIStreamChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			continue // Skip invalid chunks
 		}

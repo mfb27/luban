@@ -36,3 +36,4 @@ go.work.sum
 settings.local.json
 docs/
 config.default.yaml
+.playwright-mcp/
